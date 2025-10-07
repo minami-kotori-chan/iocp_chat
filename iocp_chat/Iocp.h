@@ -3,6 +3,7 @@
 #include "ClientInfos.h"
 #include <vector>
 #include <thread>
+#include <atomic>
 
 #define MAX_WORKERTHREAD 4  //쓰레드 풀에 넣을 쓰레드 수
 
@@ -24,6 +25,7 @@ public:
 	{
 		return mClientInfos[idx];
 	}
+	void StopServer() { DestroyThread(); };
 protected:
 	//가상 함수 선언
 	virtual void OnConnect(UINT32 idx) {};
@@ -68,9 +70,15 @@ private:
 	//1-send를 위해서 클라이언트를 순회돌면서 버퍼가 차 있고 전송중이 아닐때는 send queue방식의 1-send를 구현하게 되면서 사용안하게 된 함수임
 	void SendPacket();
 
-
 	//소켓해제
 	void CloseSocket(ClientInfo* pClientInfo, bool bIsForce = false);
+
+	//스레드 제거
+	void DestroyThread();
+
+	//현재 클라이언트수 변경함수(함수없이 하면 하면 락부분 코드가 난잡해짐)
+	void AddClientCnt();
+	void SubClientCnt();
 
 	//멤버 변수 영역//
 
@@ -93,6 +101,9 @@ private:
 	//iocp핸들
 	HANDLE mIOCPHandle = INVALID_HANDLE_VALUE;
 
+	//클라이언트 개수 락(처음에는 락을 쓰려했는데 생각해보니 락프리가 매우 효율적인 상황인것 같아서 락프리 쓰기로함
+	//std::mutex ClientCntLock;
+
 	//현재 접속중인 클라이언트 개수
-	UINT32 mClientCnt = 0;
+	std::atomic<UINT32> ClientCnt{ 0 }; // 락프리로 연산하자
 };

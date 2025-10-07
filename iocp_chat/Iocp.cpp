@@ -137,7 +137,7 @@ void IocpServer::WorkerThread()
 			continue;
 		}
 		OverlappedEx* pOverlappedEx = (OverlappedEx*)lpOverlapped;
-		if (bSuccess == FALSE || (dwIoSize == 0 && bSuccess == TRUE && pOverlappedEx != NULL && pOverlappedEx->Operation != IOOperation::ACCEPT)) {//client의 접속 끊음
+		if (bSuccess == FALSE/*rst패킷수신*/ || (dwIoSize == 0 && bSuccess == TRUE && pOverlappedEx != NULL && pOverlappedEx->Operation != IOOperation::ACCEPT)) {//client의 접속 끊음(fin패킷수신)
 			//printf("socket(%d) 접속 끊김\n", (int)pClientInfo->m_socketClient);
 			CloseSocket(pClientInfo);
 			continue;
@@ -169,7 +169,7 @@ void IocpServer::WorkerThread()
 		else if (pOverlappedEx->Operation == IOOperation::ACCEPT)
 		{
 			//이경우 pClientInfo가 null이기 때문에(아직 iocp핸들에 연결을 안했으니까 당연히 nullptr임)pOverlappedEx를 이용해서 클라이언트구조체에 접근해야함
-			mClientCnt++;//접속인원수 증가시키기
+			ClientCnt++;//접속인원수 증가시키기 락프리라서 이대로 상관없음
 			BindIOCompletionPort(GetClientInfo(pOverlappedEx->ClientIdx));//iocp에 소켓 바인딩
 			BindRecv(GetClientInfo(pOverlappedEx->ClientIdx));//비동기 수신처리
 			OnConnect(pOverlappedEx->ClientIdx);//가상함수실행
@@ -303,6 +303,29 @@ void IocpServer::CloseSocket(ClientInfo* pClientInfo, bool bIsForce)
 	closesocket(pClientInfo->SocketClient);//이를 통해 모든 소켓의 관련 정보가 정리됨 (바인딩 정보도 포함해서 정리됨)
 
 	pClientInfo->SocketClient = INVALID_SOCKET;
-	mClientCnt--;
+	ClientCnt--;
 	OnDisConnect(pClientInfo->idx);
+}
+
+void IocpServer::DestroyThread()
+{
+	mIsWorkerRun = false;
+	CloseHandle(mIOCPHandle);
+
+	for (auto& th : mIOWorkerThread)
+	{
+		if (th.joinable())
+		{
+			th.join();
+		}
+	}
+
+	//Accepter 쓰레드를 종요한다.
+	mIsAcceptRun = false;
+	closesocket(mListenSocket);
+
+	if (mAccepterThread.joinable())
+	{
+		mAccepterThread.join();
+	}
 }

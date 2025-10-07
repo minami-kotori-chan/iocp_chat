@@ -12,5 +12,6 @@ int main(void) {
 	printf("\n아무 키나 누를 때까지 대기합니다\n");
 	getchar();
 
+	IoServer.StopServer();
 	return 0;
 }
