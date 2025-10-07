@@ -1,10 +1,11 @@
-#include "iocp.h"
+#include "ChatServer.h"
 
 const UINT16 SERVER_PORT = 11021;
 const UINT16 MAX_CLIENT = 100;
 
 int main(void) {
-	IocpServer IoServer;
+	
+	ChatServer IoServer;
 	IoServer.InitSocket();
 	IoServer.BindandListen(SERVER_PORT);
 	IoServer.StartServer(MAX_CLIENT);
@@ -13,5 +14,6 @@ int main(void) {
 	getchar();
 
 	IoServer.StopServer();
+
 	return 0;
 }

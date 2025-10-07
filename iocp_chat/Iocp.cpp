@@ -66,6 +66,7 @@ bool IocpServer::StartServer(const UINT32 maxClientCount)
 	printf("\n서버실행완료\n");
 	return true;
 }
+
 //iocp객체와 completionkey연결
 bool IocpServer::BindIOCompletionPort(ClientInfo* pClientInfo)
 {
@@ -161,7 +162,9 @@ void IocpServer::WorkerThread()
 		}
 		//send 결과 처리
 		else if (pOverlappedEx->Operation == IOOperation::SEND) {
+			pClientInfo->OnSendComplete();
 			OnSendComplete(pClientInfo->idx);
+
 			//delete pOverlappedEx->pData;
 			//delete pOverlappedEx;
 		}
@@ -281,6 +284,16 @@ ClientInfo* IocpServer::GetEmptyClientInfo()
 		}
 	}
 	return nullptr;
+}
+
+void IocpServer::SendData(UINT32 idx, char* pData,int pSize)
+{
+	MessagePacket p;
+	p.PacketId = PACKET_ID::MESSAGE;
+	p.PacketSize = sizeof(PacketHead)+ pSize;
+	CopyMemory(p.Msg, pData, pSize);
+	p.DataSize = pSize;
+	GetClientInfo(idx)->SetSendData(idx,(char*)&p, p.PacketSize);
 }
 
 void IocpServer::CloseSocket(ClientInfo* pClientInfo, bool bIsForce)

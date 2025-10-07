@@ -33,7 +33,9 @@ protected:
 	virtual void OnRecv(UINT32 idx) {};
 	virtual void OnSendComplete(UINT32 idx) {};
 	
-	virtual void Start() {};//서버의 모든 초기화 완료이후 호출되는 함수
+	virtual void Start() {}//서버의 모든 초기화 완료이후 호출되는 함수
+
+	void SendData(UINT32 idx, char* pData, int pSize);//메세지 전송 함수(패킷형태로 만듬)
 
 private:
 	//iocp객체와 completionkey연결
@@ -75,10 +77,6 @@ private:
 
 	//스레드 제거
 	void DestroyThread();
-
-	//현재 클라이언트수 변경함수(함수없이 하면 하면 락부분 코드가 난잡해짐)
-	void AddClientCnt();
-	void SubClientCnt();
 
 	//멤버 변수 영역//
 
