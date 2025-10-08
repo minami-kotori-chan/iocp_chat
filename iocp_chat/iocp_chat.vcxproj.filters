@@ -44,8 +44,11 @@
     <ClInclude Include="IOCP\Iocp.h">
       <Filter>IOCP\Header</Filter>
     </ClInclude>
-    <ClInclude Include="IOCP\Packet.h">
-      <Filter>IOCP\Header</Filter>
+    <ClInclude Include="ClientSession.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Packet.h">
+      <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

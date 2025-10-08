@@ -197,7 +197,7 @@ void IocpServer::AccepterThread()
 
 		}
 		//printf("\n생성종료\n");
-		std::this_thread::sleep_for(std::chrono::milliseconds(32));//슬립, 나중에 이것도 iocp의 GQCS로 구현하면 좋을듯함.
+		std::this_thread::sleep_for(std::chrono::milliseconds(32));//슬립, 이것도 나중에 생성자 소비자로 만들어도 좋을듯 함
 	}
 }
 
@@ -272,7 +272,7 @@ bool IocpServer::BindRecv(ClientInfo* pClientInfo)
 	return true;
 }
 
-//비어있는 클라이언트 포인터 반환 함수
+//비어있는 클라이언트 포인터 반환 함수 비동기 accept이기 때문에 필요는 없음
 ClientInfo* IocpServer::GetEmptyClientInfo()
 {
 	for (auto& client : mClientInfos) {
@@ -285,12 +285,17 @@ ClientInfo* IocpServer::GetEmptyClientInfo()
 
 void IocpServer::SendData(UINT32 idx, char* pData,int pSize)
 {
+	/*packet으로 포장하는건 애플리케이션에 위임하기로 함 따라서 해당 함수는 그냥 클라이언트 구조체의 발송함수를 콜하는 역할만 함
 	MessagePacket p;
 	p.PacketId = PACKET_ID::MESSAGE;
 	p.PacketSize = sizeof(PacketHead)+ pSize;
 	CopyMemory(p.Msg, pData, pSize);
 	p.DataSize = pSize;
-	GetClientInfo(idx)->SetSendData(idx,(char*)&p, p.PacketSize);
+
+	*/
+	GetClientInfo(idx)->SetSendData(idx,pData, pSize);
+
+
 }
 
 void IocpServer::CloseSocket(ClientInfo* pClientInfo, bool bIsForce)

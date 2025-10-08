@@ -129,9 +129,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatServer.h" />
+    <ClInclude Include="ClientSession.h" />
     <ClInclude Include="IOCP\Iocp.h" />
     <ClInclude Include="IOCP\ClientInfos.h" />
-    <ClInclude Include="IOCP\Packet.h" />
+    <ClInclude Include="Packet.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

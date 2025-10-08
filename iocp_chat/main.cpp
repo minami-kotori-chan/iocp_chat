@@ -9,7 +9,6 @@ int main(void) {
 	IoServer.InitSocket();
 	IoServer.BindandListen(SERVER_PORT);
 	IoServer.StartServer(MAX_CLIENT);
-
 	printf("\n아무 키나 누를 때까지 대기합니다\n");
 	getchar();
 

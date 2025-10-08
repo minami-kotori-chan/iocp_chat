@@ -6,7 +6,6 @@
 #include <mswsock.h>
 #include <mutex>
 
-#include "Packet.h"
 
 #define MAX_SOCKBUF 1024//최대 버퍼 크기
 
@@ -128,7 +127,7 @@ struct ClientInfo
 			return;
 		}
 
-		SendHead = SendTail;
+		SendHead = SendTail;//버퍼 비우기
 
 	}
 

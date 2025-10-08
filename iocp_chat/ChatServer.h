@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IOCP/Iocp.h"
+#include "ClientSession.h"
 
 class ChatServer : public IocpServer
 {
@@ -9,7 +10,7 @@ public:
 protected:
 
 	//////////////////////////
-	//IOCP의 가상함수 override
+	//IOCP코어의 가상함수 override
 	//////////////////////////
 	virtual void OnConnect(UINT32 idx);
 	virtual void OnDisConnect(UINT32 idx);
@@ -23,5 +24,5 @@ private:
 	//유저 세션 생성함수
 	void CreateUserSession(UINT32 MaxClientCnt);
 
-
+	ClientSessionManager ClientManager;
 };
