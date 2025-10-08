@@ -30,10 +30,10 @@ protected:
 	//가상 함수 선언
 	virtual void OnConnect(UINT32 idx) {};
 	virtual void OnDisConnect(UINT32 idx) {};
-	virtual void OnRecv(UINT32 idx) {};
+	virtual void OnRecv(UINT32 idx,char* pData,UINT32 pDataSize) {};
 	virtual void OnSendComplete(UINT32 idx) {};
 	
-	virtual void Start() {}//서버의 모든 초기화 완료이후 호출되는 함수
+	virtual void Start(UINT32 maxClientCount) {}//서버의 모든 초기화 완료이후 호출되는 함수
 
 	void SendData(UINT32 idx, char* pData, int pSize);//메세지 전송 함수(패킷형태로 만듬)
 

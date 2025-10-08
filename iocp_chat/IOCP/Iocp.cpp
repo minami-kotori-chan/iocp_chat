@@ -62,7 +62,7 @@ bool IocpServer::StartServer(const UINT32 maxClientCount)
 	CreateAccepterThread();//접속용 스레드 생성
 
 
-	Start();
+	Start(maxClientCount);
 	printf("\n서버실행완료\n");
 	return true;
 }
@@ -152,9 +152,9 @@ void IocpServer::WorkerThread()
 
 		//recv 결과 처리
 		if (pOverlappedEx->Operation == IOOperation::RECV) {
-			pClientInfo->RecvBuf[dwIoSize] = 0;//소켓에서 버퍼에 쓰는 결과에는 널문자가 들어가지 않아서 직접 써줘야함
+			pClientInfo->RecvBuf[dwIoSize] = 0;//소켓에서 버퍼에 쓰는 결과에는 널문자가 들어가지 않아서 직접 써줘야함(문자열인 경우)
 			printf("수신한 문자열 : %s ", &(pClientInfo->RecvBuf[5]));//패킷헤더 구조상 5번째부터 문자열이기 때문에 5번째부터 출력(테스트용 코드임)
-			OnRecv(pClientInfo->idx);//가상함수호출
+			OnRecv(pClientInfo->idx, pClientInfo->RecvBuf, dwIoSize);//가상함수호출
 
 			//비동기 수신 처리
 			BindRecv(pClientInfo);//근데 이렇게 하면 이 클라이언트인포에서 동시에 여러개의 수신요청이 날아오면 문제가 발생하지 않나?
@@ -164,9 +164,6 @@ void IocpServer::WorkerThread()
 		else if (pOverlappedEx->Operation == IOOperation::SEND) {
 			pClientInfo->OnSendComplete();
 			OnSendComplete(pClientInfo->idx);
-
-			//delete pOverlappedEx->pData;
-			//delete pOverlappedEx;
 		}
 		//accept 결과 처리
 		else if (pOverlappedEx->Operation == IOOperation::ACCEPT)

@@ -10,9 +10,8 @@ void ChatServer::OnDisConnect(UINT32 idx)
 
 }
 
-void ChatServer::OnRecv(UINT32 idx)
+void ChatServer::OnRecv(UINT32 idx, char* pData, UINT32 pDataSize)
 {
-	//char* pStr = "Hello";
 	SendData(idx,(char*)"Hello",6);
 }
 
@@ -21,7 +20,12 @@ void ChatServer::OnSendComplete(UINT32 idx)
 
 }
 
-void ChatServer::Start()
+void ChatServer::Start(UINT32 MaxClientCnt)
+{
+
+}
+
+void ChatServer::CreateUserSession(UINT32 MaxClientCnt)
 {
 
 }

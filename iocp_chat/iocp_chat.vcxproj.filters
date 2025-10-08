@@ -13,30 +13,39 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="IOCP">
+      <UniqueIdentifier>{05ac05fc-e218-4813-955a-250459f6c28b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IOCP\Header">
+      <UniqueIdentifier>{b1e380bf-8ca1-4642-a007-0670069e1817}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="IOCP\Source">
+      <UniqueIdentifier>{95a33ab7-73d7-4710-9571-067b297f1076}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="Iocp.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="ChatSerer.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="IOCP\Iocp.cpp">
+      <Filter>IOCP\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Iocp.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="ClientInfos.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="ChatServer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="Packet.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="IOCP\ClientInfos.h">
+      <Filter>IOCP\Header</Filter>
+    </ClInclude>
+    <ClInclude Include="IOCP\Iocp.h">
+      <Filter>IOCP\Header</Filter>
+    </ClInclude>
+    <ClInclude Include="IOCP\Packet.h">
+      <Filter>IOCP\Header</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

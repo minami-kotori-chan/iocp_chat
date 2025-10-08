@@ -124,14 +124,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChatSerer.cpp" />
-    <ClCompile Include="Iocp.cpp" />
+    <ClCompile Include="IOCP\Iocp.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChatServer.h" />
-    <ClInclude Include="Iocp.h" />
-    <ClInclude Include="ClientInfos.h" />
-    <ClInclude Include="Packet.h" />
+    <ClInclude Include="IOCP\Iocp.h" />
+    <ClInclude Include="IOCP\ClientInfos.h" />
+    <ClInclude Include="IOCP\Packet.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
