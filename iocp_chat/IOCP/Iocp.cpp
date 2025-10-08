@@ -184,7 +184,7 @@ void IocpServer::WorkerThread()
 }
 
 //accept스레드
-void IocpServer::AccepterThread()
+void IocpServer::AccepterThread2()
 {
 	while (mIsAcceptRun)
 	{
@@ -198,6 +198,30 @@ void IocpServer::AccepterThread()
 		}
 		//printf("\n생성종료\n");
 		std::this_thread::sleep_for(std::chrono::milliseconds(32));//슬립, 이것도 나중에 생성자 소비자로 만들어도 좋을듯 함
+	}
+}
+
+void IocpServer::AccepterThread()
+{
+	for (const auto& clientInfo : mClientInfos) {
+		if (clientInfo->IsValid()) continue;
+		PostAccept(clientInfo);
+	}
+	while (mIsAcceptRun)
+	{
+		UINT32 idx=0;
+		bool QueCondition = false;
+		{
+			std::unique_lock<std::mutex> lock(EmptySocketQueLock);
+			RecvPacketCV.wait(lock, [this] { return !EmptySocketQue.empty() || !mIsAcceptRun; });
+			if (!EmptySocketQue.empty()) {
+				UINT32 idx = EmptySocketQue.front();
+				EmptySocketQue.pop_front();
+				QueCondition = true;
+			}
+		}
+		if(QueCondition) PostAccept(GetClientInfo(idx));
+		
 	}
 }
 
@@ -300,24 +324,8 @@ void IocpServer::SendData(UINT32 idx, char* pData,int pSize)
 
 void IocpServer::CloseSocket(ClientInfo* pClientInfo, bool bIsForce)
 {
-	linger stLinger = { 0,0 };
-
-	//force가 true이면 so_linger, timeout 0으로 강제종료
-	if (bIsForce == true)
-	{
-		stLinger.l_onoff = 1;
-	}
-
-	//소켓의 송수신 모두 중단시킴
-	shutdown(pClientInfo->SocketClient, SD_BOTH);
-
-	//소켓 옵션 설정
-	setsockopt(pClientInfo->SocketClient, SOL_SOCKET, SO_LINGER, (char*)&stLinger, sizeof(stLinger));
-
-	//소켓 연결 종료
-	closesocket(pClientInfo->SocketClient);//이를 통해 모든 소켓의 관련 정보가 정리됨 (바인딩 정보도 포함해서 정리됨)
-
-	pClientInfo->SocketClient = INVALID_SOCKET;
+	pClientInfo->CloseSocket(bIsForce);
+	
 	ClientCnt--;
 	OnDisConnect(pClientInfo->idx);
 }
@@ -343,4 +351,11 @@ void IocpServer::DestroyThread()
 	{
 		mAccepterThread.join();
 	}
+}
+
+void IocpServer::PushEmptyClient(UINT32 Idx)
+{
+	std::lock_guard<std::mutex> lock(EmptySocketQueLock);
+	EmptySocketQue.push_back(Idx);
+	RecvPacketCV.notify_one();
 }

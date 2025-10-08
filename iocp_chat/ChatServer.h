@@ -21,8 +21,6 @@ protected:
 
 
 private:
-	//蜡历 技记 积己窃荐
-	void CreateUserSession(UINT32 MaxClientCnt);
 
 	ClientSessionManager ClientManager;
 };

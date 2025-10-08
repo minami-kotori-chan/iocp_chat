@@ -25,8 +25,3 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 {
 	ClientManager.Init(MaxClientCnt);
 }
-
-void ChatServer::CreateUserSession(UINT32 MaxClientCnt)
-{
-
-}

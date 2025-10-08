@@ -4,7 +4,8 @@
 #include <vector>
 #include <thread>
 #include <atomic>
-
+#include <mutex>
+#include <deque>
 #define MAX_WORKERTHREAD 4  //쓰레드 풀에 넣을 쓰레드 수
 
 class IocpServer
@@ -56,6 +57,7 @@ private:
 	void WorkerThread();
 	//비동기 접속처리를 위한 스레드
 	void AccepterThread();
+	void AccepterThread2();
 	//비동기 접속처리를 위한 함수
 	bool PostAccept(ClientInfo* pClientInfo);
 
@@ -77,6 +79,9 @@ private:
 
 	//스레드 제거
 	void DestroyThread();
+
+	void PushEmptyClient(UINT32 Idx);
+	void PopEmptyClient(UINT32 Idx);
 
 	//멤버 변수 영역//
 
@@ -104,4 +109,11 @@ private:
 
 	//현재 접속중인 클라이언트 개수
 	std::atomic<UINT32> ClientCnt{ 0 }; // 락프리로 연산하자
+
+
+	std::deque<UINT32> EmptySocketQue;
+
+	std::mutex EmptySocketQueLock;//클라이언트구조체 lock
+	std::condition_variable RecvPacketCV; // 생산자 소비자를 위한 CV
+
 };

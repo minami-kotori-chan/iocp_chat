@@ -140,4 +140,25 @@ struct ClientInfo
 		printf("전송완료\n");
 		SendDataOnBuf();
 	}
+
+	void CloseSocket(bool bIsForce)
+	{
+		linger stLinger = { 0,0 };
+
+		//force가 true이면 so_linger, timeout 0으로 강제종료
+		if (bIsForce == true)
+		{
+			stLinger.l_onoff = 1;
+		}
+		//소켓의 송수신 모두 중단시킴
+		shutdown(SocketClient, SD_BOTH);
+
+		//소켓 옵션 설정
+		setsockopt(SocketClient, SOL_SOCKET, SO_LINGER, (char*)&stLinger, sizeof(stLinger));
+
+		//소켓 연결 종료
+		closesocket(SocketClient);//이를 통해 모든 소켓의 관련 정보가 정리됨 (바인딩 정보도 포함해서 정리됨)
+
+		SocketClient = INVALID_SOCKET;
+	}
 };
