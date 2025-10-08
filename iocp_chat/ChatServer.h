@@ -17,7 +17,9 @@ protected:
 	virtual void OnRecv(UINT32 idx,char* pData, UINT32 pDataSize);
 	virtual void OnSendComplete(UINT32 idx);
 
-	virtual void Start(UINT32 MaxClientCnt);//서버의 모든 초기화 완료이후 호출되는 함수
+	virtual void Start(UINT32 MaxClientCnt);
+	virtual void OnStopServer();
+	//서버의 모든 초기화 완료이후 호출되는 함수
 
 
 private:

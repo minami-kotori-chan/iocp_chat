@@ -26,13 +26,14 @@ public:
 	{
 		return mClientInfos[idx];
 	}
-	void StopServer() { DestroyThread(); };
+	void StopServer() { DestroyThread(); OnStopServer(); };
 protected:
 	//가상 함수 선언
 	virtual void OnConnect(UINT32 idx) {};
 	virtual void OnDisConnect(UINT32 idx) {};
 	virtual void OnRecv(UINT32 idx,char* pData,UINT32 pDataSize) {};
 	virtual void OnSendComplete(UINT32 idx) {};
+	virtual void OnStopServer() {};
 	
 	virtual void Start(UINT32 maxClientCount) {}//서버의 모든 초기화 완료이후 호출되는 함수
 

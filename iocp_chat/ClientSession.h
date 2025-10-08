@@ -129,6 +129,19 @@ public:
 		RecvPacketCV.notify_one();
 	}
 
+	void StopManager()
+	{
+		RecvPacketThreadRun = false;
+		RecvPacketCV.notify_all();
+		for (auto& thread : ProcessRecvPacketThreads) {
+			if (thread.joinable())
+			{
+				thread.join();
+			}
+		}
+		RecvPacketQueue.clear();
+	}
+
 private:
 	void CreateProcessThreads(UINT32 ThreadCnt=1)
 	{
@@ -148,17 +161,21 @@ private:
 		while (RecvPacketThreadRun)
 		{
 			LPacket packet;
+			bool IsValid = false;
 			{
 				std::unique_lock<std::mutex> lock(RecvPacketQueLock);
 
 				RecvPacketCV.wait(lock, [this] { return !RecvPacketQueue.empty() || !RecvPacketThreadRun; });
 				
+				if (RecvPacketThreadRun == false) break;
+
 				if (!RecvPacketQueue.empty()){
 					packet = PopRecvPacket();
+					IsValid = true;
 				}
 
 			}
-			PacketProcess(packet);
+			if(IsValid) PacketProcess(packet);
 		}
 	}
 

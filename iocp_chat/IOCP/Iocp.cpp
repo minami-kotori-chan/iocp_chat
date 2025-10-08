@@ -214,6 +214,8 @@ void IocpServer::AccepterThread()
 		{
 			std::unique_lock<std::mutex> lock(EmptySocketQueLock);
 			RecvPacketCV.wait(lock, [this] { return !EmptySocketQue.empty() || !mIsAcceptRun; });
+			if (mIsAcceptRun == false) break; 
+			
 			if (!EmptySocketQue.empty()) {
 				UINT32 idx = EmptySocketQue.front();
 				EmptySocketQue.pop_front();
@@ -345,12 +347,15 @@ void IocpServer::DestroyThread()
 
 	//Accepter 쓰레드를 종요한다.
 	mIsAcceptRun = false;
-	closesocket(mListenSocket);
+	RecvPacketCV.notify_all();//모든 accept스레드를 깨움
 
 	if (mAccepterThread.joinable())
 	{
 		mAccepterThread.join();
 	}
+	EmptySocketQue.clear();//accept 큐 비움
+
+	closesocket(mListenSocket);
 }
 
 void IocpServer::PushEmptyClient(UINT32 Idx)

@@ -25,3 +25,8 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 {
 	ClientManager.Init(MaxClientCnt);
 }
+
+void ChatServer::OnStopServer()
+{
+	ClientManager.StopManager();
+}
