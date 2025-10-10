@@ -153,7 +153,8 @@ private:
 	void BindFunc()//함수포인터 바인딩
 	{
 		RecvPacketFuncMap[(int)PACKET_ID::CONNECT_REQUEST] = &ClientSessionManager::OnConnect;//멤버함수포인터는 &가 필수임
-		RecvPacketFuncMap[(int)PACKET_ID::LOGIN_REQUEST] = &ClientSessionManager::OnLogin;//멤버함수포인터는 &가 필수임
+		RecvPacketFuncMap[(int)PACKET_ID::LOGIN_REQUEST] = &ClientSessionManager::OnLogin;
+		RecvPacketFuncMap[(int)PACKET_ID::ECHO_MESSAGE] = &ClientSessionManager::OnEchoMessage;
 	}
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
@@ -189,11 +190,15 @@ private:
 		else
 		{
 			//식별할 수 없는 패킷 id
-			printf("수신한 식별 불가능한 패킷 ID : %d", packet.PacketId);
+			printf("수신한 식별 불가능한 패킷 ID : %d\n", packet.PacketId);
 		}
 	}
 
-
+	void OnEchoMessage(LPacket& packet)
+	{
+		packet.pData[packet.PacketSize] = 0;
+		printf("수신 문자열 : %s", &(packet.pData[5]));
+	}
 	void OnConnect(LPacket& packet)
 	{
 		ClientSessions[packet.ClientIdx]->OnConnect();

@@ -7,7 +7,7 @@ enum class PACKET_ID: UINT16
 {
 	INVALID=0,
 
-	ECHO_MESSAGE=10,
+	ECHO_MESSAGE=1,
 
 	CONNECT_REQUEST=100,
 	CONNECT_RESPONSE=101,
@@ -23,8 +23,8 @@ enum class PACKET_ID: UINT16
 };
 
 struct PacketHead {
-	PACKET_ID PacketId;
 	UINT16 PacketSize;
+	PACKET_ID PacketId;
 };
 
 struct LPacket {//패킷정보랑 실제 데이터의 주소를 저장하는 구조체 실제 데이터부분을 memcpy하는건 비효율적이므로 그냥 포인터로 받기 위해 새로 만든 구조체임

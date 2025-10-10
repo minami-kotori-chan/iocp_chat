@@ -1,7 +1,7 @@
 #include "ChatServer.h"
 
 const UINT16 SERVER_PORT = 11021;
-const UINT16 MAX_CLIENT = 100;
+const UINT16 MAX_CLIENT = 10000*2;
 
 int main(void) {
 	
@@ -13,6 +13,6 @@ int main(void) {
 	getchar();
 
 	IoServer.StopServer();
-
+	
 	return 0;
 }

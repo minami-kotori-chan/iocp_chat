@@ -153,7 +153,7 @@ void IocpServer::WorkerThread()
 		//recv 결과 처리
 		if (pOverlappedEx->Operation == IOOperation::RECV) {
 			pClientInfo->RecvBuf[dwIoSize] = 0;//소켓에서 버퍼에 쓰는 결과에는 널문자가 들어가지 않아서 직접 써줘야함(문자열인 경우)
-			printf("수신한 문자열 : %s ", &(pClientInfo->RecvBuf[5]));//패킷헤더 구조상 5번째부터 문자열이기 때문에 5번째부터 출력(테스트용 코드임)
+			//printf("수신한 문자열 : %s ", &(pClientInfo->RecvBuf[5]));//패킷헤더 구조상 5번째부터 문자열이기 때문에 5번째부터 출력(테스트용 코드임)
 			OnRecv(pClientInfo->idx, pClientInfo->RecvBuf, dwIoSize);//가상함수호출
 
 			//비동기 수신 처리
@@ -329,7 +329,9 @@ void IocpServer::CloseSocket(ClientInfo* pClientInfo, bool bIsForce)
 	pClientInfo->CloseSocket(bIsForce);
 	
 	ClientCnt--;
+	PushEmptyClient(pClientInfo->idx);
 	OnDisConnect(pClientInfo->idx);
+	
 }
 
 void IocpServer::DestroyThread()
