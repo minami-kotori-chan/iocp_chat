@@ -2,6 +2,7 @@
 
 #include "IOCP/Iocp.h"
 #include "ClientSession.h"
+#include "DBManager.h"
 
 class ChatServer : public IocpServer
 {
@@ -23,6 +24,23 @@ protected:
 
 
 private:
+	void SetDBManager();
+	void CreateDBResultThread(UINT32 Threadcnt=1);
+	void ProcessDBResult();
 
+	void BindOnDBResultMap();
+
+
+	void ProcessLoginResult(DB_Result& DResult);
+	void ProcessSignUpResult(DB_Result& DResult);
+	void ProcessDeleteUserResult(DB_Result& DResult);
+
+	std::condition_variable* ResultQueCV=nullptr;
+	std::mutex* ResultQueLock=nullptr;
+	bool DBResultThreadRun = true;
 	ClientSessionManager ClientManager;
+	DBManager dbManager;
+
+	std::vector<std::thread> DBResultThreads;
+	std::unordered_map<DB_TYPE, void (ChatServer::*)(DB_Result&)> DBResultMap;
 };

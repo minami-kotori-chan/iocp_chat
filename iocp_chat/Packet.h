@@ -3,6 +3,7 @@
 //각종 패킷들 선언
 #define MAX_PACKET_SIZE 1024
 
+//해당 파일의 모든 구조체들은 직렬화를 해야하기때문에 오로지 데이터만 넣어놓을 것 절대 멤버함수를 만들지 말것
 enum class PACKET_ID: UINT16 
 {
 	INVALID=0,
@@ -18,6 +19,12 @@ enum class PACKET_ID: UINT16
 
 	GUEST_REQUEST = 1010,
 	GUEST_RESPONSE = 1011,
+
+	SIGNUP_REQUEST = 1020,
+	SIGNUP_RESPONSE = 1021,
+
+	DELETE_USER_REQUEST = 1030,
+	DELETE_USER_RESPONSE = 1031,
 
 	MESSAGE=2000,
 };
@@ -45,4 +52,8 @@ struct MessagePacket : PacketHead {
 struct LoginPacket : PacketHead {
 	char UserName[MAX_USERNAME_LENGTH];
 	char UserPW[MAX_USERPASSWORD_LENGTH];
+};
+
+struct ResponsePacket : PacketHead {
+	bool Success;
 };

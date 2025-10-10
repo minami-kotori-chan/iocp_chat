@@ -1,11 +1,11 @@
 #include "DBManager.h"
 
-void DBManager::Init(const char* host, const char* user, const char* passwd, unsigned int port, unsigned int ThreadCnt = 1)
+void DBManager::Init(const char* host, const char* user, const char* passwd, unsigned int port, unsigned int ThreadCnt)
 {
-	Host = host;
-	User = user;
-	Passwd = passwd;
-	Port = port;
+	Host = (char*)host;
+	User = (char*)user;
+	Passwd = (char*)passwd;
+	Port = (int)port;
 
 	CreateThread(ThreadCnt);
 }
@@ -44,6 +44,30 @@ void DBManager::PushQueryRequest(DB_Request& DRequest)
 	RequstQueCV.notify_one();
 }
 
+DB_Request DBManager::PopQueryRequest()
+{
+	std::lock_guard<std::mutex> lock(RequestQueLock);
+	DB_Request DRequest = RequestQue.front();
+	RequestQue.pop_front();
+	return DB_Request();
+}
+
+
+void DBManager::PushResultQue(DB_Result& DResult)
+{
+	std::lock_guard<std::mutex> lock(ResultQueLock);
+	ResultQue.push_back(DResult);
+	ResultQueCV.notify_one();
+}
+
+DB_Result DBManager::PopResultQue()
+{
+	std::lock_guard<std::mutex> lock(ResultQueLock);
+	DB_Result DResult = ResultQue.front();
+	ResultQue.pop_front();
+	return DResult;
+}
+
 void DBManager::ProcessQueryQue()
 {
 	ConnectionManager* Connection = new ConnectionManager();
@@ -51,15 +75,18 @@ void DBManager::ProcessQueryQue()
 
 	while (RequestThreadRun)
 	{
-		std::unique_lock<std::mutex> lock(RequestQueLock);
-		RequstQueCV.wait(lock, [this] {return !RequestQue.empty() || !RequestThreadRun; });
+		DB_Request DbRequest;
+		{
+			std::unique_lock<std::mutex> lock(RequestQueLock);
+			RequstQueCV.wait(lock, [this] {return !RequestQue.empty() || !RequestThreadRun; });
 
-		if (RequestThreadRun == false) break;
+			if (RequestThreadRun == false) break;
 
-		if (RequestQue.empty()) {
-			continue;
+			if (RequestQue.empty()) {
+				continue;
+			}
+			DbRequest = PopQueryRequest();
 		}
-		DB_Request DbRequest = PopQueryRequest();
 
 		if (DBRequestMap.find(DbRequest.Dtype) != DBRequestMap.end())
 		{
@@ -86,12 +113,5 @@ void DBManager::DeleteUserReq(ConnectionManager& Connection, DB_Request& DReques
 	Connection.DeleteUserRequest(DRequest.params.removeUser.username, DRequest.params.removeUser.password);
 }
 
-DB_Request DBManager::PopQueryRequest()
-{
-	std::lock_guard<std::mutex> lock(RequestQueLock);
-	DB_Request DRequest;
-	DRequest = RequestQue.front();
-	RequestQue.pop_front();
-	return DB_Request();
-}
+
 

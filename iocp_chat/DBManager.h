@@ -315,6 +315,14 @@ struct DB_Request
 };
 
 
+struct DB_Result
+{
+	uint32_t ClientSessionIdx;
+	DB_TYPE Dtype;
+	char UserName[MAX_NAME_LEN];
+	bool QueryResult;
+};
+
 class DBManager
 {
 public:
@@ -333,6 +341,20 @@ public:
 	
 
 	void PushQueryRequest(DB_Request& DRequest);
+	DB_Result PopResultQue();
+
+	std::condition_variable* GetResultQueLockCV()
+	{
+		return &ResultQueCV;
+	}
+	std::mutex* GetResultQueLock()
+	{
+		return &ResultQueLock;
+	}
+	bool ResultQueEmpty()
+	{
+		return ResultQue.empty();
+	}
 
 private:
 	void BindFuncOnMap();
@@ -347,13 +369,14 @@ private:
 	void DeleteUserReq(ConnectionManager& Connection, DB_Request& DRequest);
 
 	DB_Request PopQueryRequest();
+	void PushResultQue(DB_Result& DResult);
 
 	/////////////////////////////////////
 	//이 변수들은 여러 스레드에서 접근하지만 초기화 될때까지는 단일 스레드이고 초기화 된 이후로는 읽기만 하므로 lock이 필요없음
-	const char* Host = nullptr;
-	const char* User = nullptr;
-	const char* Passwd = nullptr;
-	unsigned int Port;
+	char* Host = nullptr;
+	char* User = nullptr;
+	char* Passwd = nullptr;
+	int Port;
 	/////////////////////////////////////
 
 
@@ -365,7 +388,11 @@ private:
 	std::mutex RequestQueLock;
 	std::condition_variable RequstQueCV;
 
-	std::deque<DB_Request> RequestQue;
+	std::mutex ResultQueLock;
+	std::condition_variable ResultQueCV;
 
-	std::unordered_map<DB_TYPE, void (DBManager::* )(ConnectionManager&, DB_Request& DRequest)> DBRequestMap;
+	std::deque<DB_Request> RequestQue;
+	std::deque<DB_Result> ResultQue;
+
+	std::unordered_map<DB_TYPE, void (DBManager::* )(ConnectionManager&, DB_Request&)> DBRequestMap;
 };
