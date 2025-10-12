@@ -10,11 +10,21 @@ void DBManager::Init(const char* host, const char* user, const char* passwd, uns
 	CreateThread(ThreadCnt);
 }
 
+void DBManager::BindingFuncOnDelegate(DelegateManager<void, LPacket&>& pDM)
+{
+	//pDM.BindFunc(std::bind(&PushQueryRequest, this, std::placeholders::_1));//이렇게 바인딩 할 필요가 없이 람다로 하는게 훨씬 편하고 디버깅도 쉽다.
+	pDM.BindFunc([this](LPacket& packet) {
+		PushQueryRequest(packet);
+		}
+	);
+	
+}
+
 void DBManager::BindFuncOnMap()
 {
-	DBRequestMap[DB_TYPE::LOGIN_REQ] = &DBManager::LoginReq;
-	DBRequestMap[DB_TYPE::SIGNUP_REQ] = &DBManager::SignUpReq;
-	DBRequestMap[DB_TYPE::DELETE_USER_REQ] = &DBManager::DeleteUserReq;
+	DBRequestMap[DB_TYPE::LOGIN_REQUEST] = &DBManager::LoginReq;
+	DBRequestMap[DB_TYPE::SIGNUP_REQUEST] = &DBManager::SignUpReq;
+	DBRequestMap[DB_TYPE::DELETE_USER_REQUEST] = &DBManager::DeleteUserReq;
 }
 
 void DBManager::CreateThread(unsigned int ThreadCnt)
@@ -88,9 +98,10 @@ void DBManager::ProcessQueryQue()
 			DbRequest = PopQueryRequest();
 		}
 
-		if (DBRequestMap.find(DbRequest.Dtype) != DBRequestMap.end())
+		if (DBRequestMap.find(DbRequest.PacketId) != DBRequestMap.end())
 		{
-			(this->*(DBRequestMap[DbRequest.Dtype]))(*Connection, DbRequest);
+			(DbRequest.pData)[DbRequest.PacketSize] = 0;//맨마지막에 널을 넣어줌
+			(this->*(DBRequestMap[DbRequest.PacketId]))(*Connection, DbRequest);
 		}
 
 	}
@@ -100,17 +111,20 @@ void DBManager::ProcessQueryQue()
 
 void DBManager::LoginReq(ConnectionManager& Connection, DB_Request& DRequest)
 {
-	Connection.LoginRequest(DRequest.params.login.username, DRequest.params.login.password);
+	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
+	Connection.LoginRequest(Lpacket->UserName, Lpacket->UserPW);
 }
 
 void DBManager::SignUpReq(ConnectionManager& Connection, DB_Request& DRequest)
 {
-	Connection.SignUpRequest(DRequest.params.signup.username, DRequest.params.signup.password);
+	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
+	Connection.SignUpRequest(Lpacket->UserName, Lpacket->UserPW);
 }
 
 void DBManager::DeleteUserReq(ConnectionManager& Connection, DB_Request& DRequest)
 {
-	Connection.DeleteUserRequest(DRequest.params.removeUser.username, DRequest.params.removeUser.password);
+	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
+	Connection.DeleteUserRequest(Lpacket->UserName, Lpacket->UserPW);
 }
 
 

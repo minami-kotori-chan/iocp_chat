@@ -24,21 +24,25 @@ void ChatServer::OnSendComplete(UINT32 idx)
 void ChatServer::Start(UINT32 MaxClientCnt)
 {
 	ClientManager.Init(MaxClientCnt);
+	ClientManager.SetDelegate(&delegateManager);
 
+	SetDBManager();
+	CreateDBResultThread();
 }
 
 void ChatServer::SetDBManager()
 {
-	char* user = nullptr;
-	char* passwd = nullptr;
+	char user[20];
+	char passwd[20];
 	printf("DB Id를 입력하세요 : ");
-	scanf_s("%s",user);
+	scanf_s("%s",user,sizeof(user));
 	printf("DB pw를 입력하세요 : ");
-	scanf_s("%s", passwd);
+	scanf_s("%s", passwd, sizeof(passwd));
 
 	dbManager.Init("127.0.0.1",user,passwd,3306);
 	ResultQueCV=dbManager.GetResultQueLockCV();
 	ResultQueLock = dbManager.GetResultQueLock();
+	dbManager.BindingFuncOnDelegate(delegateManager);
 }
 
 void ChatServer::CreateDBResultThread(UINT32 Threadcnt)
@@ -72,10 +76,13 @@ void ChatServer::ProcessDBResult()
 
 void ChatServer::BindOnDBResultMap()
 {
-	DBResultMap[DB_TYPE::LOGIN_REQ] = &ChatServer::ProcessLoginResult;
-	DBResultMap[DB_TYPE::SIGNUP_REQ] = &ChatServer::ProcessSignUpResult;
-	DBResultMap[DB_TYPE::DELETE_USER_REQ] = &ChatServer::ProcessDeleteUserResult;
+	DBResultMap[DB_TYPE::LOGIN_REQUEST] = &ChatServer::ProcessLoginResult;
+	DBResultMap[DB_TYPE::SIGNUP_REQUEST] = &ChatServer::ProcessSignUpResult;
+	DBResultMap[DB_TYPE::DELETE_USER_REQUEST] = &ChatServer::ProcessDeleteUserResult;
 }
+
+
+
 
 void ChatServer::ProcessLoginResult(DB_Result& DResult)
 {
@@ -104,9 +111,20 @@ void ChatServer::ProcessDeleteUserResult(DB_Result& DResult)
 	Rpacket.Success = DResult.QueryResult;
 	SendData(DResult.ClientSessionIdx, (char*)&Rpacket, sizeof(Rpacket));
 }
-
+void ChatServer::CloseDBResultThread()
+{
+	DBResultThreadRun = false;
+	ResultQueCV->notify_all();
+	for (auto& th : DBResultThreads) {
+		if (th.joinable()) {
+			th.join();
+		}
+	}
+}
 
 void ChatServer::OnStopServer()
 {
 	ClientManager.StopManager();
+	dbManager.CloseThread();
+	CloseDBResultThread();
 }

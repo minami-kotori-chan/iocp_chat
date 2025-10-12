@@ -3,6 +3,7 @@
 #include "IOCP/Iocp.h"
 #include "ClientSession.h"
 #include "DBManager.h"
+#include "DelegateManager.h"
 
 class ChatServer : public IocpServer
 {
@@ -29,7 +30,7 @@ private:
 	void ProcessDBResult();
 
 	void BindOnDBResultMap();
-
+	void CloseDBResultThread();
 
 	void ProcessLoginResult(DB_Result& DResult);
 	void ProcessSignUpResult(DB_Result& DResult);
@@ -43,4 +44,6 @@ private:
 
 	std::vector<std::thread> DBResultThreads;
 	std::unordered_map<DB_TYPE, void (ChatServer::*)(DB_Result&)> DBResultMap;
+	
+	DelegateManager<void, LPacket&> delegateManager;
 };

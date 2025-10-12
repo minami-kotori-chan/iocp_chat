@@ -150,6 +150,7 @@
     <ClInclude Include="ChatServer.h" />
     <ClInclude Include="ClientSession.h" />
     <ClInclude Include="DBManager.h" />
+    <ClInclude Include="DelegateManager.h" />
     <ClInclude Include="IOCP\Iocp.h" />
     <ClInclude Include="IOCP\ClientInfos.h" />
     <ClInclude Include="Packet.h" />

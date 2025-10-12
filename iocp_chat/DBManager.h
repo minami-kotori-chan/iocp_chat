@@ -7,14 +7,18 @@
 #include <thread>
 #include <mutex>
 #include <deque>
+#include "Packet.h"
+#include "DelegateManager.h"
 
-enum class DB_TYPE : unsigned short
+typedef PACKET_ID DB_TYPE;//처음에는 dbtype을 따로 만드려했는데 packet데이터를 읽어서 처리하게 하기로 수정하고 이에 기존 코드수정을 최소화 하기 위해서 그대로 씀
+typedef LPacket DB_Request;
+/*enum class DB_TYPE : unsigned short
 {
 	SIGNUP_REQ=10,
 	LOGIN_REQ=11,
 
 	DELETE_USER_REQ = 1000,
-};
+};*/
 
 struct ConnectionManager
 {
@@ -58,9 +62,9 @@ struct ConnectionManager
 		// 등록할 모든 쿼리를 정의
 		// 굳이 해시로 만드는 이유는 enum으로된 db type관리가 용이해지므로 또한 바인딩 이후에는 필요없으므로 지역변수로 선언
 		const std::unordered_map<DB_TYPE, const char*> queryRegistry = {
-			{ DB_TYPE::SIGNUP_REQ, "INSERT INTO users (username, password_hash) VALUES (?, ?)" },
-			{ DB_TYPE::LOGIN_REQ,  "SELECT password_hash FROM users WHERE username = ?" },
-			{ DB_TYPE::DELETE_USER_REQ,  "DELETE FROM users WHERE username = ?" },
+			{ DB_TYPE::SIGNUP_REQUEST, "INSERT INTO users (username, password_hash) VALUES (?, ?)" },
+			{ DB_TYPE::LOGIN_REQUEST,  "SELECT password_hash FROM users WHERE username = ?" },
+			{ DB_TYPE::DELETE_USER_REQUEST,  "DELETE FROM users WHERE username = ?" },
 		};
 
 		printf("Preparing SQL statements...\n");
@@ -100,7 +104,7 @@ struct ConnectionManager
 	bool LoginRequest(const char* username, const char* userpw)
 	{
 		// 1. 미리 준비된 LOGIN_REQ Statement 핸들을 가져옵니다.
-		auto it = preparedStatements.find(DB_TYPE::LOGIN_REQ);
+		auto it = preparedStatements.find(DB_TYPE::LOGIN_REQUEST);
 		if (it == preparedStatements.end())
 		{
 			fprintf(stderr, "Error: LOGIN_REQ statement not prepared.\n");
@@ -184,7 +188,7 @@ struct ConnectionManager
 	bool SignUpRequest(const char* username, const char* userpw)
 	{
 		// 미리 준비된 SIGNUP_REQ Statement 에서 MYSQL_STMT 가져옴
-		auto it = preparedStatements.find(DB_TYPE::SIGNUP_REQ);
+		auto it = preparedStatements.find(DB_TYPE::SIGNUP_REQUEST);
 		if (it == preparedStatements.end())
 		{
 			fprintf(stderr, "Error: SIGNUP_REQ statement not prepared.\n");
@@ -236,7 +240,7 @@ struct ConnectionManager
 	bool DeleteUserRequest(const char* username, const char* userpw)
 	{//참고로 pw받는 이유는 회원 검증을 위해서임
 		// MYSQL_STMT얻기
-		auto it = preparedStatements.find(DB_TYPE::DELETE_USER_REQ);
+		auto it = preparedStatements.find(DB_TYPE::DELETE_USER_REQUEST);
 		if (it == preparedStatements.end())
 		{
 			fprintf(stderr, "Error: DELETE_USER_REQ statement not prepared.\n");
@@ -283,7 +287,7 @@ struct ConnectionManager
 
 #define MAX_NAME_LEN 32
 #define MAX_PW_LEN 32
-
+/*
 struct DB_Request
 {
 	DB_TYPE Dtype;
@@ -313,8 +317,7 @@ struct DB_Request
 	}params;
 
 };
-
-
+*/
 struct DB_Result
 {
 	uint32_t ClientSessionIdx;
@@ -338,8 +341,8 @@ public:
 
 	//DB초기화 작업 conn할당 추후 스레드 풀 기능도 여기서 만들어야함
 	void Init(const char* host, const char* user, const char* passwd, unsigned int port, unsigned int ThreadCnt = 1);
-	
-
+	void BindingFuncOnDelegate(DelegateManager<void, LPacket&>& pDM);
+	void CloseThread();
 	void PushQueryRequest(DB_Request& DRequest);
 	DB_Result PopResultQue();
 
@@ -360,7 +363,7 @@ private:
 	void BindFuncOnMap();
 
 	void CreateThread(unsigned int ThreadCnt);
-	void CloseThread();
+	
 	void ProcessQueryQue();
 
 

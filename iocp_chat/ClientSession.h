@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
+#include "DelegateManager.h"
 
 enum class ClinetState : UINT16
 {
@@ -141,7 +142,10 @@ public:
 		}
 		RecvPacketQueue.clear();
 	}
-
+	void SetDelegate(DelegateManager<void, LPacket&>* pDM)
+	{
+		pDelegateManager = pDM;
+	}
 private:
 	void CreateProcessThreads(UINT32 ThreadCnt=1)
 	{
@@ -187,7 +191,7 @@ private:
 		{
 			(this->*(RecvPacketFuncMap[(int)(packet.PacketId)]))(packet);//함수포인터 코드 iter로 바꾸는게 나을수도 있을듯
 		}
-		else
+		else 
 		{
 			//식별할 수 없는 패킷 id
 			printf("수신한 식별 불가능한 패킷 ID : %d\n", packet.PacketId);
@@ -207,7 +211,8 @@ private:
 	void OnLogin(LPacket& packet)
 	{
 		LoginPacket* LoginP = (LoginPacket*)(packet.pData);
-
+		//여기에 db요청 코드 필요함 아래 코드도 로그인 완료 이후에 동작하게 바꾸어야함 << 델리게이트를 사용하자! 델리게이트 이벤트 호출
+		pDelegateManager->CallAllFunc(packet);
 		ClientSessions[packet.ClientIdx]->OnLogin(LoginP->UserName, MAX_USERNAME_LENGTH);
 	}
 
@@ -229,4 +234,6 @@ private:
 
 	std::mutex RecvPacketQueLock;//RecvQue 락
 	std::condition_variable RecvPacketCV; // 생산자 소비자를 위한 CV;
+
+	DelegateManager<void, LPacket&>* pDelegateManager;
 };

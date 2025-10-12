@@ -1,4 +1,5 @@
 #pragma once
+#include <basetsd.h>
 
 //각종 패킷들 선언
 #define MAX_PACKET_SIZE 1024
@@ -46,8 +47,8 @@ struct MessagePacket : PacketHead {
 	UINT16 DataSize;
 };
 
-#define MAX_USERNAME_LENGTH 256
-#define MAX_USERPASSWORD_LENGTH 256
+#define MAX_USERNAME_LENGTH 32
+#define MAX_USERPASSWORD_LENGTH 32
 
 struct LoginPacket : PacketHead {
 	char UserName[MAX_USERNAME_LENGTH];
