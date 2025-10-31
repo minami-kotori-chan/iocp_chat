@@ -322,8 +322,8 @@ struct DB_Result
 {
 	uint32_t ClientSessionIdx;
 	DB_TYPE Dtype;
-	char UserName[MAX_NAME_LEN];
 	bool QueryResult;
+	char UserName[MAX_NAME_LEN];
 };
 
 class DBManager
@@ -367,9 +367,10 @@ private:
 	void ProcessQueryQue();
 
 
-	void LoginReq(ConnectionManager& Connection, DB_Request& DRequest);
-	void SignUpReq(ConnectionManager& Connection, DB_Request& DRequest);
-	void DeleteUserReq(ConnectionManager& Connection, DB_Request& DRequest);
+	bool LoginReq(ConnectionManager& Connection, DB_Request& DRequest);
+	void SetDBResult(DB_Request& DRequest, bool IsSuccess);
+	bool SignUpReq(ConnectionManager& Connection, DB_Request& DRequest);
+	bool DeleteUserReq(ConnectionManager& Connection, DB_Request& DRequest);
 
 	DB_Request PopQueryRequest();
 	void PushResultQue(DB_Result& DResult);
@@ -397,5 +398,5 @@ private:
 	std::deque<DB_Request> RequestQue;
 	std::deque<DB_Result> ResultQue;
 
-	std::unordered_map<DB_TYPE, void (DBManager::* )(ConnectionManager&, DB_Request&)> DBRequestMap;
+	std::unordered_map<DB_TYPE, bool (DBManager::* )(ConnectionManager&, DB_Request&)> DBRequestMap;
 };

@@ -31,6 +31,7 @@ struct ClientSession
 
 	std::string UserName;//추후에 이것도 char배열로 만들어야 함 동적할당 최소화를 위해서
 
+	std::mutex ClientSessionLock;
 
 	ClientSession()
 	{
@@ -38,10 +39,12 @@ struct ClientSession
 		BufHead = 0;
 		BufTail = 0;
 		BufDataSize = 0;
+		UserName.reserve(MAX_USERNAME_LENGTH);
 	}
 
 	void SetDataOnBuf(char *pData, UINT16 pDataSize)//락필요
 	{
+		std::lock_guard<std::mutex> lock(ClientSessionLock);
 		if (BufTail + pDataSize >= MAX_SEESION_BUFSIZE)
 		{
 			if (BufDataSize != 0) {
@@ -59,7 +62,7 @@ struct ClientSession
 		BufDataSize += pDataSize;
 	}
 
-	void SetSystemDataOnBuf(PACKET_ID pId)
+	void SetSystemDataOnBuf(PACKET_ID pId)//락필요
 	{
 		PacketHead pHead;
 		pHead.PacketId = pId;
@@ -69,6 +72,7 @@ struct ClientSession
 
 	LPacket GetDataOnBuf()//락필요
 	{
+		std::lock_guard<std::mutex> lock(ClientSessionLock);
 		PacketHead* pHead = (PacketHead*)(&SessionRecvBuf[BufHead]);
 		if (BufDataSize == 0 || pHead->PacketSize == 0) {
 			return LPacket();
@@ -85,15 +89,18 @@ struct ClientSession
 	}
 	void OnConnect()
 	{
-		CState = ClinetState::CONNECTED;
+		{
+			std::lock_guard<std::mutex> lock(ClientSessionLock);
+			CState = ClinetState::CONNECTED;
+		}
 		printf("\nClient Connected id : %d\n", ClientIdx);
 	}
-	void OnLogin(char *LoginName,UINT8 NameSize)
+	void OnLogin(char *LoginName,UINT8 NameSize)//로그인 성공시
 	{
-		CState = ClinetState::LOGIN;
+		std::lock_guard<std::mutex> lock(ClientSessionLock);
 		UserName = LoginName;
+		CState = ClinetState::LOGIN;
 	}
-
 };
 
 class ClientSessionManager
@@ -213,7 +220,13 @@ private:
 		LoginPacket* LoginP = (LoginPacket*)(packet.pData);
 		//여기에 db요청 코드 필요함 아래 코드도 로그인 완료 이후에 동작하게 바꾸어야함 << 델리게이트를 사용하자! 델리게이트 이벤트 호출
 		pDelegateManager->CallAllFunc(packet);
-		ClientSessions[packet.ClientIdx]->OnLogin(LoginP->UserName, MAX_USERNAME_LENGTH);
+		//ClientSessions[packet.ClientIdx]->OnLogin(LoginP->UserName, MAX_USERNAME_LENGTH);
+	}
+
+	void OnLoginSuccess(UINT32 idx,char* UserName,char NameSize)
+	{
+		UserName[NameSize - 1] = 0;
+		ClientSessions[idx]->OnLogin(UserName,NameSize);
 	}
 
 	LPacket PopRecvPacket()

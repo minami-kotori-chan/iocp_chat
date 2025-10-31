@@ -101,30 +101,45 @@ void DBManager::ProcessQueryQue()
 		if (DBRequestMap.find(DbRequest.PacketId) != DBRequestMap.end())
 		{
 			(DbRequest.pData)[DbRequest.PacketSize] = 0;//맨마지막에 널을 넣어줌
-			(this->*(DBRequestMap[DbRequest.PacketId]))(*Connection, DbRequest);
+			bool IsSuccess = (this->*(DBRequestMap[DbRequest.PacketId]))(*Connection, DbRequest);
+			SetDBResult(DbRequest, IsSuccess);
 		}
 
 	}
 	Connection->CloseConnection();
 
 }
-
-void DBManager::LoginReq(ConnectionManager& Connection, DB_Request& DRequest)
+void DBManager::SetDBResult(DB_Request& DRequest, bool IsSuccess)
 {
-	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
-	Connection.LoginRequest(Lpacket->UserName, Lpacket->UserPW);
+	DB_Result DResult;
+	DResult.ClientSessionIdx = DRequest.ClientIdx;
+	DResult.Dtype = DRequest.PacketId;
+	DResult.QueryResult = IsSuccess;
+
+	memcpy(DResult.UserName, ((LoginPacket*)(DRequest.pData))->UserName, MAX_NAME_LEN);
+
+	PushResultQue(DResult);
 }
 
-void DBManager::SignUpReq(ConnectionManager& Connection, DB_Request& DRequest)
+bool DBManager::LoginReq(ConnectionManager& Connection, DB_Request& DRequest)
 {
-	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
-	Connection.SignUpRequest(Lpacket->UserName, Lpacket->UserPW);
+	LoginPacket* Loginpacket = (LoginPacket*)(DRequest.pData);
+	bool IsSuccess = Connection.LoginRequest(Loginpacket->UserName, Loginpacket->UserPW);
+	return IsSuccess;
 }
 
-void DBManager::DeleteUserReq(ConnectionManager& Connection, DB_Request& DRequest)
+bool DBManager::SignUpReq(ConnectionManager& Connection, DB_Request& DRequest)
 {
 	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
-	Connection.DeleteUserRequest(Lpacket->UserName, Lpacket->UserPW);
+	bool IsSuccess = Connection.SignUpRequest(Lpacket->UserName, Lpacket->UserPW);
+	return IsSuccess;
+}
+
+bool DBManager::DeleteUserReq(ConnectionManager& Connection, DB_Request& DRequest)
+{
+	LoginPacket* Lpacket = (LoginPacket*)(DRequest.pData);
+	bool IsSuccess = Connection.DeleteUserRequest(Lpacket->UserName, Lpacket->UserPW);
+	return IsSuccess;
 }
 
 
