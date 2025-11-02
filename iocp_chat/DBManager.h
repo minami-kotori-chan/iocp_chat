@@ -9,6 +9,7 @@
 #include <deque>
 #include "Packet.h"
 #include "DelegateManager.h"
+#include <optional>
 
 typedef PACKET_ID DB_TYPE;//처음에는 dbtype을 따로 만드려했는데 packet데이터를 읽어서 처리하게 하기로 수정하고 이에 기존 코드수정을 최소화 하기 위해서 그대로 씀
 typedef LPacket DB_Request;
@@ -344,7 +345,7 @@ public:
 	void BindingFuncOnDelegate(DelegateManager<void, LPacket&>& pDM);
 	void CloseThread();
 	void PushQueryRequest(DB_Request& DRequest);
-	DB_Result PopResultQue();
+	std::optional<DB_Result> PopResultQue();
 
 	std::condition_variable* GetResultQueLockCV()
 	{
@@ -359,6 +360,7 @@ public:
 		return ResultQue.empty();
 	}
 
+	void CloseResultQue();
 private:
 	void BindFuncOnMap();
 
@@ -387,6 +389,7 @@ private:
 	const char* db = "mysql";// 접속할 데이터베이스 이름
 
 	bool RequestThreadRun = true;
+	bool ResultQueStop = false;
 	std::vector<std::thread> ConnectionThreads;
 
 	std::mutex RequestQueLock;
@@ -397,6 +400,7 @@ private:
 
 	std::deque<DB_Request> RequestQue;
 	std::deque<DB_Result> ResultQue;
+
 
 	std::unordered_map<DB_TYPE, bool (DBManager::* )(ConnectionManager&, DB_Request&)> DBRequestMap;
 };

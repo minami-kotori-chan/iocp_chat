@@ -8,6 +8,7 @@
 #include <functional>
 #include <string>
 #include "DelegateManager.h"
+#include "ResultQueManager.h"
 
 enum class ClinetState : UINT16
 {
@@ -31,7 +32,7 @@ struct ClientSession
 
 	std::string UserName;//추후에 이것도 char배열로 만들어야 함 동적할당 최소화를 위해서
 
-	std::mutex ClientSessionLock;
+	std::mutex ClientSessionLock;//세션 락, 추후에 CSate를 아토믹으로 만들어 주자
 
 	ClientSession()
 	{
@@ -101,6 +102,12 @@ struct ClientSession
 		UserName = LoginName;
 		CState = ClinetState::LOGIN;
 	}
+	void OnLogout()
+	{
+		std::lock_guard<std::mutex> lock(ClientSessionLock);
+		CState = ClinetState::CONNECTED;
+		UserName = "";
+	}
 };
 
 class ClientSessionManager
@@ -153,6 +160,15 @@ public:
 	{
 		pDelegateManager = pDM;
 	}
+	void OnLoginSuccess(UINT32 idx, char* UserName, char NameSize)
+	{
+		UserName[NameSize - 1] = 0;
+		ClientSessions[idx]->OnLogin(UserName, NameSize);
+	}
+	void BindResultQue(ResultQueManager* RManager)
+	{
+		RQueManager = RManager;
+	}
 private:
 	void CreateProcessThreads(UINT32 ThreadCnt=1)
 	{
@@ -166,6 +182,7 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::CONNECT_REQUEST] = &ClientSessionManager::OnConnect;//멤버함수포인터는 &가 필수임
 		RecvPacketFuncMap[(int)PACKET_ID::LOGIN_REQUEST] = &ClientSessionManager::OnLogin;
 		RecvPacketFuncMap[(int)PACKET_ID::ECHO_MESSAGE] = &ClientSessionManager::OnEchoMessage;
+		RecvPacketFuncMap[(int)PACKET_ID::LOGOUT_REQUEST] = &ClientSessionManager::OnLogout;
 	}
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
@@ -219,15 +236,17 @@ private:
 	{
 		LoginPacket* LoginP = (LoginPacket*)(packet.pData);
 		//여기에 db요청 코드 필요함 아래 코드도 로그인 완료 이후에 동작하게 바꾸어야함 << 델리게이트를 사용하자! 델리게이트 이벤트 호출
-		pDelegateManager->CallAllFunc(packet);
+		pDelegateManager->CallAllFunc(packet);//db에 요청보내는 경우 
 		//ClientSessions[packet.ClientIdx]->OnLogin(LoginP->UserName, MAX_USERNAME_LENGTH);
 	}
 
-	void OnLoginSuccess(UINT32 idx,char* UserName,char NameSize)
+	void OnLogout(LPacket& packet)
 	{
-		UserName[NameSize - 1] = 0;
-		ClientSessions[idx]->OnLogin(UserName,NameSize);
+		ClientSessions[packet.ClientIdx]->OnLogout();
+		RQueManager->PushResultQue(packet);
 	}
+
+	
 
 	LPacket PopRecvPacket()
 	{
@@ -247,6 +266,8 @@ private:
 
 	std::mutex RecvPacketQueLock;//RecvQue 락
 	std::condition_variable RecvPacketCV; // 생산자 소비자를 위한 CV;
+
+	ResultQueManager* RQueManager=nullptr;
 
 	DelegateManager<void, LPacket&>* pDelegateManager;
 };

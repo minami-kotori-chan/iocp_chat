@@ -20,6 +20,8 @@ void DBManager::BindingFuncOnDelegate(DelegateManager<void, LPacket&>& pDM)
 	
 }
 
+
+
 void DBManager::BindFuncOnMap()
 {
 	DBRequestMap[DB_TYPE::LOGIN_REQUEST] = &DBManager::LoginReq;
@@ -70,12 +72,28 @@ void DBManager::PushResultQue(DB_Result& DResult)
 	ResultQueCV.notify_one();
 }
 
-DB_Result DBManager::PopResultQue()
+std::optional<DB_Result> DBManager::PopResultQue()
 {
+	/*
 	std::lock_guard<std::mutex> lock(ResultQueLock);
 	DB_Result DResult = ResultQue.front();
 	ResultQue.pop_front();
 	return DResult;
+	*/
+	std::unique_lock<std::mutex> lock(ResultQueLock);
+	ResultQueCV.wait(lock, [this] {return !ResultQue.empty() || ResultQueStop; });
+
+	if (ResultQueStop == true && ResultQue.empty()) return std::nullopt;//종료 조건 확인
+
+	DB_Result ResultPacket = ResultQue.front();
+	ResultQue.pop_front();
+	return ResultPacket;
+}
+
+void DBManager::CloseResultQue()
+{
+	ResultQueStop = true;
+	ResultQueCV.notify_all();
 }
 
 void DBManager::ProcessQueryQue()
@@ -109,6 +127,7 @@ void DBManager::ProcessQueryQue()
 	Connection->CloseConnection();
 
 }
+
 void DBManager::SetDBResult(DB_Request& DRequest, bool IsSuccess)
 {
 	DB_Result DResult;

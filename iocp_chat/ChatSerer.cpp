@@ -28,6 +28,8 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 
 	SetDBManager();
 	CreateDBResultThread();
+
+	ClientManager.BindResultQue(&RQueManager);
 }
 
 void ChatServer::SetDBManager()
@@ -40,9 +42,6 @@ void ChatServer::SetDBManager()
 	scanf_s("%s", passwd, sizeof(passwd));
 
 	dbManager.Init("127.0.0.1",user,passwd,3306);
-	ResultQueCV=dbManager.GetResultQueLockCV();
-	ResultQueLock = dbManager.GetResultQueLock();
-	dbManager.BindingFuncOnDelegate(delegateManager);
 }
 
 void ChatServer::CreateDBResultThread(UINT32 Threadcnt)
@@ -53,32 +52,50 @@ void ChatServer::CreateDBResultThread(UINT32 Threadcnt)
 	
 }
 
+void ChatServer::CreatePacketResultThread(UINT32 Threadcnt)
+{
+	for (UINT32 i = 0; i < Threadcnt; i++) {
+		PacketResultThreads.emplace_back([this]() {ProcessPacketResult(); });
+	}
+}
+
 void ChatServer::ProcessDBResult()
 {
 	while (DBResultThreadRun)
 	{
-		DB_Result DbResult;
+		std::optional<DB_Result> DbResult;
+		DbResult = dbManager.PopResultQue();
+		if (!DbResult.has_value()) break;
+		DB_Result dbResult = DbResult.value();
+		if (DBResultMap.find(dbResult.Dtype) != DBResultMap.end())
 		{
-			std::unique_lock<std::mutex> lock(*ResultQueLock);
-			ResultQueCV->wait(lock, [this] {return !dbManager.ResultQueEmpty() || !DBResultThreadRun; });
-			if (DBResultThreadRun == false) break;
-			if (dbManager.ResultQueEmpty()) {
-				continue;
-			}
-			DbResult = dbManager.PopResultQue();
-		}
-		if (DBResultMap.find(DbResult.Dtype) != DBResultMap.end())
-		{
-			(this->*(DBResultMap[DbResult.Dtype]))(DbResult);
+			(this->*(DBResultMap[dbResult.Dtype]))(dbResult);
 		}
 	}
 }
 
-void ChatServer::BindOnDBResultMap()
+void ChatServer::ProcessPacketResult()
+{
+	while (PacketResultThreadRun)
+	{
+		std::optional<LPacket> packetResult;
+		packetResult = RQueManager.PopResultQue();
+		if (!packetResult.has_value()) break;
+		LPacket pResult = packetResult.value();
+		if (PacketResultMap.find(pResult.PacketId) != PacketResultMap.end())
+		{
+			(this->*(PacketResultMap[pResult.PacketId]))(pResult);
+		}
+	}
+}
+
+void ChatServer::BindOnResultMap()
 {
 	DBResultMap[DB_TYPE::LOGIN_REQUEST] = &ChatServer::ProcessLoginResult;
 	DBResultMap[DB_TYPE::SIGNUP_REQUEST] = &ChatServer::ProcessSignUpResult;
 	DBResultMap[DB_TYPE::DELETE_USER_REQUEST] = &ChatServer::ProcessDeleteUserResult;
+
+	PacketResultMap[PACKET_ID::LOGOUT_REQUEST] = &ChatServer::ProcessLogoutResult;
 }
 
 
@@ -91,7 +108,7 @@ void ChatServer::ProcessLoginResult(DB_Result& DResult)
 	Rpacket.PacketSize = sizeof(ResponsePacket);
 	Rpacket.Success = DResult.QueryResult;
 	SendData(DResult.ClientSessionIdx, (char*) & Rpacket, sizeof(Rpacket));
-
+	ClientManager.OnLoginSuccess(DResult.ClientSessionIdx, DResult.UserName,32);
 }
 
 void ChatServer::ProcessSignUpResult(DB_Result& DResult)
@@ -110,12 +127,34 @@ void ChatServer::ProcessDeleteUserResult(DB_Result& DResult)
 	Rpacket.PacketSize = sizeof(ResponsePacket);
 	Rpacket.Success = DResult.QueryResult;
 	SendData(DResult.ClientSessionIdx, (char*)&Rpacket, sizeof(Rpacket));
+
 }
+void ChatServer::ProcessLogoutResult(LPacket& packet)
+{
+	ResponsePacket Rpacket;
+	Rpacket.PacketId = PACKET_ID::LOGIN_RESPONSE;
+	Rpacket.PacketSize = sizeof(ResponsePacket);
+	Rpacket.Success = true;//로그아웃이 실패할 일은 존재하지않음
+	SendData(packet.ClientIdx, (char*)&Rpacket, sizeof(Rpacket));
+}
+
+
 void ChatServer::CloseDBResultThread()
 {
 	DBResultThreadRun = false;
-	ResultQueCV->notify_all();
+	dbManager.CloseResultQue();
 	for (auto& th : DBResultThreads) {
+		if (th.joinable()) {
+			th.join();
+		}
+	}
+}
+
+void ChatServer::ClosePacketResultThread()
+{
+	PacketResultThreadRun = false;
+	RQueManager.ResultQueManagerStop();
+	for (auto& th : PacketResultThreads) {
 		if (th.joinable()) {
 			th.join();
 		}
@@ -127,4 +166,5 @@ void ChatServer::OnStopServer()
 	ClientManager.StopManager();
 	dbManager.CloseThread();
 	CloseDBResultThread();
+	ClosePacketResultThread();
 }
