@@ -18,15 +18,16 @@ public:
 
 	bool EnterRoom(UINT32 UserIdx)
 	{
+		
 		std::lock_guard<std::shared_mutex> lock(UserHashLock);
 		if (EnterUsers.size() == MaxEnterSize) return false;
 		EnterUsers.insert(UserIdx);
 	}
-
-	void LeaveRoom(UINT32 UserIdx)
+	bool LeaveRoom(UINT32 UserIdx)
 	{
 		std::lock_guard<std::shared_mutex> lock(UserHashLock);
-		EnterUsers.erase(UserIdx);
+		if (EnterUsers.erase(UserIdx) > 0) return true;
+		return false;
 	}
 
 	bool CheckUserInRoom(UINT32 UserIdx)
@@ -56,6 +57,7 @@ public:
 				ArrayCount++;
 			}
 		}
+
 		for(const auto& i : UserCopy){
 			MessageSender->SendData(i,pData.pData, pData.PacketSize);//직접전송
 		}
@@ -89,11 +91,12 @@ public:
 		}
 		return false;
 	}
-	void LeaveRoom(UINT32 UserIdx, UINT32 RoomId)
+	bool LeaveRoom(UINT32 UserIdx, UINT32 RoomId)
 	{
 		if (RoomId < Rooms.size()) {
-			Rooms[RoomId]->LeaveRoom(UserIdx);
+			return Rooms[RoomId]->LeaveRoom(UserIdx);
 		}
+		return false;
 	}
 	bool CheckUserInRoom(UINT32 UserIdx, UINT32 RoomId)
 	{

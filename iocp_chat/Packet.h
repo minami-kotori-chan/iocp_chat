@@ -5,14 +5,14 @@
 #define MAX_PACKET_SIZE 1024
 
 //해당 파일의 모든 구조체들은 직렬화를 해야하기때문에 오로지 데이터만 넣어놓을 것 절대 멤버함수를 만들지 말것
-enum class PACKET_ID: UINT16 
+enum class PACKET_ID : UINT16
 {
-	INVALID=0,
+	INVALID = 0,
 
-	ECHO_MESSAGE=1,
+	ECHO_MESSAGE = 1,
 
-	CONNECT_REQUEST=100,
-	CONNECT_RESPONSE=101,
+	CONNECT_REQUEST = 100,
+	CONNECT_RESPONSE = 101,
 
 
 	LOGIN_REQUEST = 1000,
@@ -30,15 +30,18 @@ enum class PACKET_ID: UINT16
 	DELETE_USER_REQUEST = 1030,
 	DELETE_USER_RESPONSE = 1031,
 
-	MESSAGE_REQUEST=2000,
+	MESSAGE_REQUEST = 2000,
 	MESSAGE_RESPONSE = 2001,
 
-	ENTER_ROOM_REQUEST=2010,
-	ENTER_ROOM_RESPONSE=2011,
+	ENTER_ROOM_REQUEST = 2010,
+	ENTER_ROOM_RESPONSE = 2011,
 
-	EXIT_ROOM_REQUEST=2012,
-	EXIT_ROOM_RESPONSE=2013,
+	EXIT_ROOM_REQUEST = 2012,
+	EXIT_ROOM_RESPONSE = 2013,
 
+
+	NOTICE_ROOM_NEW_USER = 3000,
+	NOTICE_ROOM_EXIT_USER = 3001,
 };
 
 struct PacketHead {
@@ -69,16 +72,25 @@ struct LoginPacket : PacketHead {
 	char UserPW[MAX_USERPASSWORD_LENGTH];
 };
 
-
-struct EnterRoomPacket : PacketHead {
-	UINT32 RoomId;
-
-};
-struct ExitRoomPacket : PacketHead {
-
+struct GuestPacket : PacketHead {
+	char UserName[MAX_USERNAME_LENGTH];
+	UINT8 NameSize;
 };
 
 
 struct ResponsePacket : PacketHead {
 	bool Success;
+};
+
+//방 관련 패킷
+
+struct EnterRoomPacket : PacketHead {
+	UINT32 RoomId;
+};
+struct ExitRoomPacket : PacketHead {
+
+};
+struct NoticeNewUserEnter : PacketHead {
+	char UserName[MAX_USERNAME_LENGTH];
+	UINT8 NameSize;
 };
