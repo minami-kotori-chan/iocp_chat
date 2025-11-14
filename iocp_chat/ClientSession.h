@@ -7,14 +7,18 @@
 #include <unordered_map>
 #include <functional>
 #include <string>
+#include <shared_mutex>
 #include "DelegateManager.h"
 #include "ResultQueManager.h"
+#include "RoomManager.h"
+#include "PacketSenderInterface.h"
 
 enum class ClinetState : UINT16
 {
 	NONE=0,
 	CONNECTED=1000,//연결은 됐는데 로그인은 안된 상태
-	LOGIN=2000,
+	LOGIN=2000,//로그인까지만 되어있는 상태
+	ROOMIN=3000,//방 들어간 상태
 };
 
 #define MAX_SEESION_BUFSIZE MAX_SOCKBUF * 8//IOCP코어의 소켓크기 * 8로 링버퍼 초과 막기
@@ -30,9 +34,11 @@ struct ClientSession
 	UINT16 BufTail;//buf Write
 	UINT16 BufDataSize;
 
+	UINT32 RoomId;
+
 	std::string UserName;//추후에 이것도 char배열로 만들어야 함 동적할당 최소화를 위해서
 
-	std::mutex ClientSessionLock;//세션 락, 추후에 CSate를 아토믹으로 만들어 주자
+	std::shared_mutex ClientSessionLock;//세션 락, 추후에 CSate를 아토믹으로 만들어 주자<<<바꾸려고 했는데 함수에서 CState만 바꾸는게 아니라서 그냥 뮤텍스 유지하기로함
 
 	ClientSession()
 	{
@@ -45,7 +51,7 @@ struct ClientSession
 
 	void SetDataOnBuf(char *pData, UINT16 pDataSize)//락필요
 	{
-		std::lock_guard<std::mutex> lock(ClientSessionLock);
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		if (BufTail + pDataSize >= MAX_SEESION_BUFSIZE)
 		{
 			if (BufDataSize != 0) {
@@ -73,7 +79,7 @@ struct ClientSession
 
 	LPacket GetDataOnBuf()//락필요
 	{
-		std::lock_guard<std::mutex> lock(ClientSessionLock);
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		PacketHead* pHead = (PacketHead*)(&SessionRecvBuf[BufHead]);
 		if (BufDataSize == 0 || pHead->PacketSize == 0) {
 			return LPacket();
@@ -88,25 +94,41 @@ struct ClientSession
 		BufDataSize -= pHead->PacketSize;
 		return pInfo;
 	}
+	UINT32 GetUserRoomId()//읽기만 하니까 sharedlock으로
+	{
+		std::shared_lock<std::shared_mutex> lock(ClientSessionLock);
+		return RoomId;
+	}
 	void OnConnect()
 	{
 		{
-			std::lock_guard<std::mutex> lock(ClientSessionLock);
+			std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 			CState = ClinetState::CONNECTED;
 		}
 		printf("\nClient Connected id : %d\n", ClientIdx);
 	}
 	void OnLogin(char *LoginName,UINT8 NameSize)//로그인 성공시
 	{
-		std::lock_guard<std::mutex> lock(ClientSessionLock);
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		UserName = LoginName;
 		CState = ClinetState::LOGIN;
 	}
 	void OnLogout()
 	{
-		std::lock_guard<std::mutex> lock(ClientSessionLock);
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		CState = ClinetState::CONNECTED;
 		UserName = "";
+	}
+	void EnterRoom(UINT32 Roomid)
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		this->RoomId = Roomid;
+		CState = ClinetState::ROOMIN;
+	}
+	void ExitRoom()
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		CState = ClinetState::LOGIN;
 	}
 };
 
@@ -124,6 +146,14 @@ public:
 		BindFunc();
 		CreateProcessThreads();
 	}
+
+	void SetSender(PacketSenderInterface* sender)
+	{
+		//room 초기화
+		roomManager.Init();
+		roomManager.SetSender(sender);
+	}
+
 	ClientSession* GetClient(UINT32 idx)
 	{
 		return ClientSessions[idx];
@@ -183,6 +213,9 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::LOGIN_REQUEST] = &ClientSessionManager::OnLogin;
 		RecvPacketFuncMap[(int)PACKET_ID::ECHO_MESSAGE] = &ClientSessionManager::OnEchoMessage;
 		RecvPacketFuncMap[(int)PACKET_ID::LOGOUT_REQUEST] = &ClientSessionManager::OnLogout;
+		RecvPacketFuncMap[(int)PACKET_ID::MESSAGE_REQUEST] = &ClientSessionManager::OnMessage;
+		RecvPacketFuncMap[(int)PACKET_ID::ENTER_ROOM_REQUEST] = &ClientSessionManager::OnEnterRoom;
+		RecvPacketFuncMap[(int)PACKET_ID::EXIT_ROOM_REQUEST] = &ClientSessionManager::OnExitRoom;
 	}
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
@@ -243,9 +276,36 @@ private:
 	void OnLogout(LPacket& packet)
 	{
 		ClientSessions[packet.ClientIdx]->OnLogout();
-		RQueManager->PushResultQue(packet);
+		PushLpacketResult(PACKET_ID::LOGIN_RESPONSE, true);
+	}
+	void OnMessage(LPacket& packet)
+	{
+
+		roomManager.BroadCastAllRoomUser(ClientSessions[packet.ClientIdx]->GetUserRoomId(), packet);
+		//룸에서 자체적으로 send하므로 큐에 넣을 필요 없음
+	}
+	void OnEnterRoom(LPacket& packet)
+	{
+		EnterRoomPacket* EnterPacket= (EnterRoomPacket*)packet.pData;
+		bool Success = roomManager.EnterRoom(packet.ClientIdx, EnterPacket->RoomId);
+		ClientSessions[packet.ClientIdx]->EnterRoom(EnterPacket->RoomId);
+		PushLpacketResult(PACKET_ID::LOGIN_RESPONSE, Success);
+	}
+	void OnExitRoom(LPacket& packet)
+	{
+		roomManager.LeaveRoom(packet.ClientIdx, ClientSessions[packet.ClientIdx]->GetUserRoomId());
+		ClientSessions[packet.ClientIdx]->ExitRoom();
+		PushLpacketResult(PACKET_ID::LOGIN_RESPONSE,true);
 	}
 
+	void PushLpacketResult(PACKET_ID pid,bool Success)
+	{
+		LPacketResult Rpacket;
+		Rpacket.PacketId = pid;
+		Rpacket.PacketSize = sizeof(ResponsePacket);
+		Rpacket.Success = Success;
+		RQueManager->PushResultQue(Rpacket);
+	}
 	
 
 	LPacket PopRecvPacket()
@@ -270,4 +330,6 @@ private:
 	ResultQueManager* RQueManager=nullptr;
 
 	DelegateManager<void, LPacket&>* pDelegateManager;
+
+	RoomManager roomManager;
 };

@@ -62,5 +62,11 @@
     <ClInclude Include="ResultQueManager.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="RoomManager.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="PacketSenderInterface.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

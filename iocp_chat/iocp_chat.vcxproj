@@ -156,7 +156,9 @@
     <ClInclude Include="IOCP\Iocp.h" />
     <ClInclude Include="IOCP\ClientInfos.h" />
     <ClInclude Include="Packet.h" />
+    <ClInclude Include="PacketSenderInterface.h" />
     <ClInclude Include="ResultQueManager.h" />
+    <ClInclude Include="RoomManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

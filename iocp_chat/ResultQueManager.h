@@ -8,7 +8,7 @@ class ResultQueManager
 {
 public:
 
-	void PushResultQue(LPacket& ResultPacket)
+	void PushResultQue(LPacketResult& ResultPacket)
 	{
 		{
 		std::lock_guard<std::mutex> lock(ResultQueLock);
@@ -16,7 +16,7 @@ public:
 		}
 		ResultQueCV.notify_one();
 	}
-	std::optional<LPacket> PopResultQue()
+	std::optional<LPacketResult> PopResultQue()
 	{
 		std::unique_lock<std::mutex> lock(ResultQueLock);
 		ResultQueCV.wait(lock, [this] {return !ResultQue.empty() || ResultQueStop; });
@@ -24,7 +24,7 @@ public:
 		if (ResultQueStop == true && ResultQue.empty()) return std::nullopt;//종료 조건 확인
 
 
-		LPacket ResultPacket = ResultQue.front();
+		LPacketResult ResultPacket = ResultQue.front();
 		ResultQue.pop_front();
 		return ResultPacket;
 	}
@@ -38,6 +38,6 @@ private:
 
 	std::mutex ResultQueLock;
 	std::condition_variable ResultQueCV;
-	std::deque<LPacket> ResultQue;
+	std::deque<LPacketResult> ResultQue;
 	bool ResultQueStop = false;
 };

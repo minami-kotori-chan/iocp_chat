@@ -30,7 +30,15 @@ enum class PACKET_ID: UINT16
 	DELETE_USER_REQUEST = 1030,
 	DELETE_USER_RESPONSE = 1031,
 
-	MESSAGE=2000,
+	MESSAGE_REQUEST=2000,
+	MESSAGE_RESPONSE = 2001,
+
+	ENTER_ROOM_REQUEST=2010,
+	ENTER_ROOM_RESPONSE=2011,
+
+	EXIT_ROOM_REQUEST=2012,
+	EXIT_ROOM_RESPONSE=2013,
+
 };
 
 struct PacketHead {
@@ -43,6 +51,9 @@ struct LPacket {//패킷정보랑 실제 데이터의 주소를 저장하는 구조체 실제 데이터부�
 	UINT16 PacketSize;
 	UINT32 ClientIdx;
 	char* pData;
+};
+struct LPacketResult : LPacket {
+	bool Success;
 };
 
 struct MessagePacket : PacketHead {
@@ -57,6 +68,16 @@ struct LoginPacket : PacketHead {
 	char UserName[MAX_USERNAME_LENGTH];
 	char UserPW[MAX_USERPASSWORD_LENGTH];
 };
+
+
+struct EnterRoomPacket : PacketHead {
+	UINT32 RoomId;
+
+};
+struct ExitRoomPacket : PacketHead {
+
+};
+
 
 struct ResponsePacket : PacketHead {
 	bool Success;

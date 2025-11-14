@@ -25,6 +25,7 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 {
 	ClientManager.Init(MaxClientCnt);
 	ClientManager.SetDelegate(&delegateManager);
+	ClientManager.SetSender(this);
 
 	SetDBManager();
 	CreateDBResultThread();
@@ -78,13 +79,17 @@ void ChatServer::ProcessPacketResult()
 {
 	while (PacketResultThreadRun)
 	{
-		std::optional<LPacket> packetResult;
+		std::optional<LPacketResult> packetResult;
 		packetResult = RQueManager.PopResultQue();
 		if (!packetResult.has_value()) break;
-		LPacket pResult = packetResult.value();
+		LPacketResult pResult = packetResult.value();
 		if (PacketResultMap.find(pResult.PacketId) != PacketResultMap.end())
 		{
 			(this->*(PacketResultMap[pResult.PacketId]))(pResult);
+		}
+		else
+		{
+			SendResponsePacket(pResult);
 		}
 	}
 }
@@ -102,7 +107,7 @@ void ChatServer::BindOnResultMap()
 
 
 void ChatServer::ProcessLoginResult(DB_Result& DResult)
-{
+{ 
 	ResponsePacket Rpacket;
 	Rpacket.PacketId = PACKET_ID::LOGIN_RESPONSE;
 	Rpacket.PacketSize = sizeof(ResponsePacket);
@@ -129,12 +134,17 @@ void ChatServer::ProcessDeleteUserResult(DB_Result& DResult)
 	SendData(DResult.ClientSessionIdx, (char*)&Rpacket, sizeof(Rpacket));
 
 }
-void ChatServer::ProcessLogoutResult(LPacket& packet)
+void ChatServer::ProcessLogoutResult(LPacketResult& packet)
+{
+	SendResponsePacket(packet);
+}
+
+void ChatServer::SendResponsePacket(LPacketResult& packet)
 {
 	ResponsePacket Rpacket;
-	Rpacket.PacketId = PACKET_ID::LOGIN_RESPONSE;
+	Rpacket.PacketId = packet.PacketId;
 	Rpacket.PacketSize = sizeof(ResponsePacket);
-	Rpacket.Success = true;//로그아웃이 실패할 일은 존재하지않음
+	Rpacket.Success = packet.Success;
 	SendData(packet.ClientIdx, (char*)&Rpacket, sizeof(Rpacket));
 }
 
