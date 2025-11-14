@@ -75,7 +75,7 @@ public:
 	void Init(UINT32 RoomsCount=100)
 	{
 		for (UINT32 i = 0; i < RoomsCount; i++) {
-			Rooms.emplace_back();
+			Rooms.emplace_back(new ChatRoom());
 		}
 	}
 	void SetSender(PacketSenderInterface* Sender)
@@ -85,32 +85,32 @@ public:
 	bool EnterRoom(UINT32 UserIdx,UINT32 RoomId)
 	{
 		if (RoomId < Rooms.size()) {
-			return Rooms[RoomId].EnterRoom(UserIdx);
+			return Rooms[RoomId]->EnterRoom(UserIdx);
 		}
 		return false;
 	}
 	void LeaveRoom(UINT32 UserIdx, UINT32 RoomId)
 	{
 		if (RoomId < Rooms.size()) {
-			Rooms[RoomId].LeaveRoom(UserIdx);
+			Rooms[RoomId]->LeaveRoom(UserIdx);
 		}
 	}
 	bool CheckUserInRoom(UINT32 UserIdx, UINT32 RoomId)
 	{
 		if (RoomId < Rooms.size()) {
-			return Rooms[RoomId].CheckUserInRoom(UserIdx);
+			return Rooms[RoomId]->CheckUserInRoom(UserIdx);
 		}
 		return false;
 	}
 	void BroadCastAllRoomUser(UINT32 RoomId, LPacket& pData)
 	{
 		if (RoomId < Rooms.size()) {
-			Rooms[RoomId].BroadCastAllRoomUser(MessageSender,pData);
+			Rooms[RoomId]->BroadCastAllRoomUser(MessageSender,pData);
 		}
 	}
 private:
 
 
 	PacketSenderInterface* MessageSender;
-	std::vector<ChatRoom> Rooms;
+	std::vector<ChatRoom*> Rooms;
 };
