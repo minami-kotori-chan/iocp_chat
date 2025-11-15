@@ -12,7 +12,7 @@ void ChatServer::OnDisConnect(UINT32 idx)
 
 void ChatServer::OnRecv(UINT32 idx, char* pData, UINT32 pDataSize)
 {
-	SendData(idx,(char*)"Hello",6);
+	//SendData(idx,(char*)"Hello",6);
 	ClientManager.PushRecvPacket(idx,pData,pDataSize);
 }
 
@@ -29,7 +29,7 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 
 	SetDBManager();
 	CreateDBResultThread();
-
+	CreatePacketResultThread();
 	ClientManager.BindResultQue(&RQueManager);
 }
 
@@ -90,6 +90,7 @@ void ChatServer::ProcessPacketResult()
 		else
 		{
 			SendResponsePacket(pResult);
+			printf("전송완료 packet id : %d ", pResult.PacketId);
 		}
 	}
 }

@@ -216,7 +216,7 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::MESSAGE_REQUEST] = &ClientSessionManager::OnMessage;
 		RecvPacketFuncMap[(int)PACKET_ID::ENTER_ROOM_REQUEST] = &ClientSessionManager::OnEnterRoom;
 		RecvPacketFuncMap[(int)PACKET_ID::EXIT_ROOM_REQUEST] = &ClientSessionManager::OnExitRoom;
-		RecvPacketFuncMap[(int)PACKET_ID::GUEST_REQUEST] = &ClientSessionManager::OnExitRoom;
+		RecvPacketFuncMap[(int)PACKET_ID::GUEST_REQUEST] = &ClientSessionManager::OnGuestLogin;
 	}
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
@@ -278,12 +278,13 @@ private:
 	{
 		GuestPacket* LoginP = (GuestPacket*)(packet.pData);
 		ClientSessions[packet.ClientIdx]->OnLogin(LoginP->UserName, LoginP->NameSize);
-		PushLpacketResult(PACKET_ID::GUEST_RESPONSE, true);
+		printf("수신 문자열 : %s", &LoginP->UserName);
+		PushLpacketResult(PACKET_ID::GUEST_RESPONSE, true, packet);
 	}
 	void OnLogout(LPacket& packet)
 	{
 		ClientSessions[packet.ClientIdx]->OnLogout();
-		PushLpacketResult(PACKET_ID::LOGIN_RESPONSE, true);
+		PushLpacketResult(PACKET_ID::LOGIN_RESPONSE, true, packet);
 	}
 	void OnMessage(LPacket& packet)
 	{
@@ -296,7 +297,7 @@ private:
 		EnterRoomPacket* EnterPacket= (EnterRoomPacket*)packet.pData;
 		bool Success = roomManager.EnterRoom(packet.ClientIdx, EnterPacket->RoomId);
 		ClientSessions[packet.ClientIdx]->EnterRoom(EnterPacket->RoomId);
-		//PushLpacketResult(PACKET_ID::ENTER_ROOM_REQUEST, Success);//모든 유저를 순회하면서 패킷을 전송하므로 굳이 안해도 될듯함
+		PushLpacketResult(PACKET_ID::ENTER_ROOM_RESPONSE, Success,packet);
 		if (Success == false) return;
 		NoticeNewUserEnter NewUserEnter;
 		NewUserEnter.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
@@ -316,7 +317,7 @@ private:
 		bool Success = roomManager.LeaveRoom(packet.ClientIdx, ClientSessions[packet.ClientIdx]->GetUserRoomId());
 		if (Success == false) return;
 		ClientSessions[packet.ClientIdx]->ExitRoom();
-		PushLpacketResult(PACKET_ID::EXIT_ROOM_RESPONSE,true);//룸에 자기자신이 없기때문에 알려야함
+		PushLpacketResult(PACKET_ID::EXIT_ROOM_RESPONSE,true, packet);//룸에 자기자신이 없기때문에 알려야함
 
 		NoticeNewUserEnter NewUserEnter;
 		NewUserEnter.PacketId = PACKET_ID::NOTICE_ROOM_EXIT_USER;
@@ -330,12 +331,13 @@ private:
 		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
 	
-	void PushLpacketResult(PACKET_ID pid,bool Success)
+	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
 	{
 		LPacketResult Rpacket;
 		Rpacket.PacketId = pid;
 		Rpacket.PacketSize = sizeof(ResponsePacket);
 		Rpacket.Success = Success;
+		Rpacket.ClientIdx = packet.ClientIdx;
 		RQueManager->PushResultQue(Rpacket);
 	}
 	

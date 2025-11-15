@@ -46,7 +46,7 @@ public:
 		}
 		*/
 		// 해시를 복사해서 락 점유를 최소화 하는 동작방식
-		char UserCopy[MAX_ENTER_USER_COUNT];
+		UINT32 UserCopy[MAX_ENTER_USER_COUNT];
 		UINT32 totaluser = 0;
 		{
 			std::shared_lock<std::shared_mutex> lock(UserHashLock);
@@ -57,9 +57,12 @@ public:
 				ArrayCount++;
 			}
 		}
-
+		/*
 		for(const auto& i : UserCopy){
 			MessageSender->SendData(i,pData.pData, pData.PacketSize);//직접전송
+		}*/
+		for (UINT32 i = 0; i < totaluser; i++) {
+			MessageSender->SendData(UserCopy[i], pData.pData, pData.PacketSize);
 		}
 		
 	}
@@ -109,6 +112,7 @@ public:
 	{
 		if (RoomId < Rooms.size()) {
 			Rooms[RoomId]->BroadCastAllRoomUser(MessageSender,pData);
+			printf("%d번방 송신 완료", RoomId);
 		}
 	}
 private:
