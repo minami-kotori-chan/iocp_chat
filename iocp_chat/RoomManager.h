@@ -112,7 +112,7 @@ public:
 	{
 		if (RoomId < Rooms.size()) {
 			Rooms[RoomId]->BroadCastAllRoomUser(MessageSender,pData);
-			printf("%d번방 송신 완료", RoomId);
+			//printf("%d번방 송신 완료", RoomId);
 		}
 	}
 private:

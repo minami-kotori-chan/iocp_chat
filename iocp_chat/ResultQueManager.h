@@ -12,6 +12,7 @@ public:
 	{
 		{
 		std::lock_guard<std::mutex> lock(ResultQueLock);
+		if (ResultQue.size() >= MaxQueueSize) return;
 		ResultQue.push_back(ResultPacket);
 		}
 		ResultQueCV.notify_one();
@@ -35,7 +36,7 @@ public:
 	}
 
 private:
-
+	const UINT32 MaxQueueSize = 1024 * 1024 * 128;//√÷¥Î 3GB
 	std::mutex ResultQueLock;
 	std::condition_variable ResultQueCV;
 	std::deque<LPacketResult> ResultQue;

@@ -49,15 +49,16 @@ struct ClientSession
 		UserName.reserve(MAX_USERNAME_LENGTH);
 	}
 
-	void SetDataOnBuf(char *pData, UINT16 pDataSize)//락필요
+	bool SetDataOnBuf(char *pData, UINT16 pDataSize)//락필요
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		if (BufDataSize + pDataSize > MAX_SEESION_BUFSIZE) return false;
 		if (BufTail + pDataSize >= MAX_SEESION_BUFSIZE)
 		{
 			if (BufDataSize != 0) {
 				CopyMemory(&SessionRecvBuf[0], &SessionRecvBuf[BufHead], BufDataSize);//읽어야하는 부분부터 복제
-				BufTail = BufDataSize;
 				BufHead = 0;
+				BufTail = BufDataSize;
 			}
 			else {
 				BufTail = 0;
@@ -67,6 +68,7 @@ struct ClientSession
 		CopyMemory(&SessionRecvBuf[BufTail], pData, pDataSize);
 		BufTail += pDataSize;
 		BufDataSize += pDataSize;
+		return true;
 	}
 
 	void SetSystemDataOnBuf(PACKET_ID pId)//락필요
@@ -162,9 +164,11 @@ public:
 	void PushRecvPacket(UINT32 idx, char* pData, UINT16 pDataSize)
 	{
 		std::lock_guard<std::mutex> lock(RecvPacketQueLock);
-		ClientSessions[idx]->SetDataOnBuf(pData, pDataSize);
-		RecvPacketQueue.push_back(idx);
-		RecvPacketCV.notify_one();
+		if (ClientSessions[idx]->SetDataOnBuf(pData, pDataSize)) {
+			RecvPacketQueue.push_back(idx);
+			RecvPacketCV.notify_one();
+		}
+		
 	}
 	void PushSystemPacket(UINT32 idx, PACKET_ID pId)
 	{
@@ -200,7 +204,7 @@ public:
 		RQueManager = RManager;
 	}
 private:
-	void CreateProcessThreads(UINT32 ThreadCnt=1)
+	void CreateProcessThreads(UINT32 ThreadCnt=8)
 	{
 		for (UINT32 i = 0; i < ThreadCnt; i++) {
 			ProcessRecvPacketThreads.emplace_back([this]() {ProcessRecvPacket(); });

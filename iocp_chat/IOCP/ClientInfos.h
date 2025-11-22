@@ -137,7 +137,7 @@ struct ClientInfo
 	{
 		std::lock_guard<std::mutex> Lock(IsSendBufLock);
 		IsSending = false;//lock필요
-		printf("전송완료\n");
+		//printf("전송완료\n");
 		SendDataOnBuf();
 	}
 

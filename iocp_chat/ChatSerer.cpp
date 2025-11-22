@@ -29,7 +29,7 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 
 	SetDBManager();
 	CreateDBResultThread();
-	CreatePacketResultThread();
+	CreatePacketResultThread(2);
 	ClientManager.BindResultQue(&RQueManager);
 }
 
@@ -90,7 +90,7 @@ void ChatServer::ProcessPacketResult()
 		else
 		{
 			SendResponsePacket(pResult);
-			printf("전송완료 packet id : %d ", pResult.PacketId);
+			//printf("전송완료 packet id : %d \n", pResult.PacketId);
 		}
 	}
 }
