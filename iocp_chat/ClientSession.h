@@ -155,7 +155,10 @@ public:
 		roomManager.Init();
 		roomManager.SetSender(sender);
 	}
-
+	void SetThroughput(std::atomic<UINT64>& lostpacket)
+	{
+		LostPacketCountPtr = &lostpacket;
+	}
 	ClientSession* GetClient(UINT32 idx)
 	{
 		return ClientSessions[idx];
@@ -168,7 +171,11 @@ public:
 			RecvPacketQueue.push_back(idx);
 			RecvPacketCV.notify_one();
 		}
-		
+		else {
+			if (LostPacketCountPtr) {
+				(*LostPacketCountPtr)++;
+			}
+		}
 	}
 	void PushSystemPacket(UINT32 idx, PACKET_ID pId)
 	{
@@ -257,6 +264,10 @@ private:
 		{
 			//식별할 수 없는 패킷 id
 			printf("수신한 식별 불가능한 패킷 ID : %d\n", packet.PacketId);
+			if (LostPacketCountPtr)
+			{
+				(*LostPacketCountPtr)++;
+			}
 		}
 	}
 
@@ -370,4 +381,6 @@ private:
 	DelegateManager<void, LPacket&>* pDelegateManager;
 
 	RoomManager roomManager;
+	std::atomic<UINT64>* LostPacketCountPtr=nullptr;
+	std::atomic<UINT64>* Throughput=nullptr;
 };

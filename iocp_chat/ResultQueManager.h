@@ -33,6 +33,7 @@ public:
 	void ResultQueManagerStop()
 	{
 		ResultQueStop = true;
+		ResultQueCV.notify_all();
 	}
 
 private:

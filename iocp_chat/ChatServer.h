@@ -26,19 +26,25 @@ protected:
 	//서버의 모든 초기화 완료이후 호출되는 함수
 
 	//Send용 인터페이스 오버라이딩
-	virtual void SendData(UINT32 idx, char* pData, int Psize) { IocpServer::SendData(idx, pData, Psize); }//추후 필요한 경우 room에서 resultque거치지 않고 직접 send가능하게 하기 위해 작성
+	virtual void SendData(UINT32 idx, char* pData, int Psize) {IocpServer::SendData(idx, pData, Psize); Throughput++;}//추후 필요한 경우 room에서 resultque거치지 않고 직접 send가능하게 하기 위해 작성
 
 private:
 	void SetDBManager();
 	void CreateDBResultThread(UINT32 Threadcnt=1);
 	void CreatePacketResultThread(UINT32 Threadcnt = 1);
 
+	void CreateTPSThread();
+
 	void ProcessDBResult();
 	void ProcessPacketResult();
+
+	void CalcTPSThread();
 
 	void BindOnResultMap();
 	void CloseDBResultThread();
 	void ClosePacketResultThread();
+
+	void CloseTPSThread();
 
 	void ProcessLoginResult(DB_Result& DResult);
 	void ProcessSignUpResult(DB_Result& DResult);
@@ -50,11 +56,15 @@ private:
 
 	bool DBResultThreadRun = true;
 	bool PacketResultThreadRun = true;
+	bool CalcTPSThreadRun = true;
+
 	ClientSessionManager ClientManager;
 	DBManager dbManager;
 
 	std::vector<std::thread> DBResultThreads;
 	std::vector<std::thread> PacketResultThreads;
+
+	std::thread TPSThread;
 
 	std::unordered_map<DB_TYPE, void (ChatServer::*)(DB_Result&)> DBResultMap;
 	std::unordered_map<PACKET_ID, void (ChatServer::*)(LPacketResult&)> PacketResultMap;
@@ -62,4 +72,8 @@ private:
 	ResultQueManager RQueManager;
 	
 	DelegateManager<void, LPacket&> delegateManager;
+
+	std::atomic<UINT64> Throughput{0};//처리량을 저장하는 변수
+	std::atomic<UINT64> LostPacketCount{ 0 };
+
 };

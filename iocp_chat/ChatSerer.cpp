@@ -26,11 +26,13 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 	ClientManager.Init(MaxClientCnt);
 	ClientManager.SetDelegate(&delegateManager);
 	ClientManager.SetSender(this);
+	ClientManager.SetThroughput(LostPacketCount);
 
 	SetDBManager();
 	CreateDBResultThread();
 	CreatePacketResultThread(2);
 	ClientManager.BindResultQue(&RQueManager);
+	CreateTPSThread();
 }
 
 void ChatServer::SetDBManager()
@@ -58,6 +60,11 @@ void ChatServer::CreatePacketResultThread(UINT32 Threadcnt)
 	for (UINT32 i = 0; i < Threadcnt; i++) {
 		PacketResultThreads.emplace_back([this]() {ProcessPacketResult(); });
 	}
+}
+
+void ChatServer::CreateTPSThread()
+{
+	TPSThread = std::thread([this]() {CalcTPSThread(); });
 }
 
 void ChatServer::ProcessDBResult()
@@ -91,7 +98,19 @@ void ChatServer::ProcessPacketResult()
 		{
 			SendResponsePacket(pResult);
 			//printf("전송완료 packet id : %d \n", pResult.PacketId);
+			Throughput++;
 		}
+	}
+}
+
+void ChatServer::CalcTPSThread()
+{
+	while (CalcTPSThreadRun)
+	{
+		printf("처리량 : %lld 손실량 : %lld\n", Throughput.load(), LostPacketCount.load());
+		Throughput.store(0);
+		LostPacketCount.store(0);
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));//1초마다 측정
 	}
 }
 
@@ -172,10 +191,19 @@ void ChatServer::ClosePacketResultThread()
 	}
 }
 
+void ChatServer::CloseTPSThread()
+{
+	CalcTPSThreadRun = false;
+	if (TPSThread.joinable()){
+		TPSThread.join();
+	}
+}
+
 void ChatServer::OnStopServer()
 {
 	ClientManager.StopManager();
 	dbManager.CloseThread();
 	CloseDBResultThread();
 	ClosePacketResultThread();
+	CloseTPSThread();
 }
