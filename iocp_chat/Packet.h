@@ -71,6 +71,8 @@ struct MessagePacket : PacketHead {
 struct LoginPacket : PacketHead {
 	char UserName[MAX_USERNAME_LENGTH];
 	char UserPW[MAX_USERPASSWORD_LENGTH];
+	UINT16 NameSize;
+	UINT16 PWSize;
 };
 
 struct GuestPacket : PacketHead {

@@ -45,6 +45,8 @@ void ChatServer::SetDBManager()
 	scanf_s("%s", passwd, sizeof(passwd));
 
 	dbManager.Init("127.0.0.1",user,passwd,3306);
+	dbManager.BindingFuncOnDelegate(delegateManager);
+	BindOnResultMap();
 }
 
 void ChatServer::CreateDBResultThread(UINT32 Threadcnt)

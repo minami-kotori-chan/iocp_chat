@@ -33,12 +33,13 @@ struct ConnectionManager
 			mysql_library_init(0, NULL, NULL);//멀티스레드 환경이라면 써줘야함
 
 			Conn = mysql_init(NULL);
+			std::string userid= user, userpw= passwd;
 
-			if (mysql_real_connect(Conn, host, user, passwd, db, port, NULL, 0) == NULL) {
+			if (mysql_real_connect(Conn, host, userid.c_str(), userpw.c_str(), db, port, NULL, 0) == NULL) {
 				// 연결 실패 시 에러 메시지 출력
 				printf("연결 실패");
 			}
-			printf("서버 버전 정보 : %s", mysql_get_server_info(Conn));
+			printf("서버 버전 정보 : %s\n", mysql_get_server_info(Conn));
 
 		}
 		SetPrepareQuery();
@@ -102,7 +103,7 @@ struct ConnectionManager
 		return true;
 	}
 
-	bool LoginRequest(const char* username, const char* userpw)
+	bool LoginRequest(const char* username, char* userpw,const UINT16 NameSize,const UINT16 PWSize)
 	{
 		// 1. 미리 준비된 LOGIN_REQ Statement 핸들을 가져옵니다.
 		auto it = preparedStatements.find(DB_TYPE::LOGIN_REQUEST);
@@ -117,11 +118,11 @@ struct ConnectionManager
 		MYSQL_BIND param_bind[1];
 		memset(param_bind, 0, sizeof(param_bind)); // MYSQL_BIND 배열은 항상 0으로 초기화
 
-		unsigned long username_len = strlen(username);
+		//unsigned long username_len = strlen(username);
 
 		param_bind[0].buffer_type = MYSQL_TYPE_STRING;
 		param_bind[0].buffer = (char*)username;
-		param_bind[0].buffer_length = username_len;
+		param_bind[0].buffer_length = NameSize;
 
 		if (mysql_stmt_bind_param(stmt, param_bind) != 0)
 		{
@@ -173,6 +174,8 @@ struct ConnectionManager
 			if (mysql_stmt_fetch(stmt) == 0) // 성공 시 0 반환
 			{
 				// 8. 입력된 비밀번호와 DB에서 가져온 비밀번호를 비교합니다.
+				fetched_password_hash[hash_length] = 0;
+				userpw[PWSize] = 0;
 				if (strcmp(userpw, fetched_password_hash) == 0)
 				{
 					login_success = true; // 일치하면 로그인 성공
@@ -341,7 +344,7 @@ public:
 	}
 
 	//DB초기화 작업 conn할당 추후 스레드 풀 기능도 여기서 만들어야함
-	void Init(const char* host, const char* user, const char* passwd, unsigned int port, unsigned int ThreadCnt = 1);
+	void Init(const char* host, const char* user,const char* passwd, unsigned int port, unsigned int ThreadCnt = 1);
 	void BindingFuncOnDelegate(DelegateManager<void, LPacket&>& pDM);
 	void CloseThread();
 	void PushQueryRequest(DB_Request& DRequest);
@@ -379,9 +382,9 @@ private:
 
 	/////////////////////////////////////
 	//이 변수들은 여러 스레드에서 접근하지만 초기화 될때까지는 단일 스레드이고 초기화 된 이후로는 읽기만 하므로 lock이 필요없음
-	char* Host = nullptr;
-	char* User = nullptr;
-	char* Passwd = nullptr;
+	std::string Host;
+	std::string User;
+	std::string Passwd;
 	int Port;
 	/////////////////////////////////////
 

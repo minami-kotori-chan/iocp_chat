@@ -1,13 +1,14 @@
 #include "DBManager.h"
 
-void DBManager::Init(const char* host, const char* user, const char* passwd, unsigned int port, unsigned int ThreadCnt)
+void DBManager::Init(const char* host, const char* user,const char* passwd, unsigned int port, unsigned int ThreadCnt)
 {
-	Host = (char*)host;
-	User = (char*)user;
-	Passwd = (char*)passwd;
+	Host = host;
+	User = user;
+	Passwd = passwd;
 	Port = (int)port;
 
 	CreateThread(ThreadCnt);
+	BindFuncOnMap();
 }
 
 void DBManager::BindingFuncOnDelegate(DelegateManager<void, LPacket&>& pDM)
@@ -99,7 +100,7 @@ void DBManager::CloseResultQue()
 void DBManager::ProcessQueryQue()
 {
 	ConnectionManager* Connection = new ConnectionManager();
-	Connection->Init(Host,User,Passwd,Port,db);
+	Connection->Init(Host.c_str(), User.c_str(), Passwd.c_str(), Port, db);
 
 	while (RequestThreadRun)
 	{
@@ -113,7 +114,10 @@ void DBManager::ProcessQueryQue()
 			if (RequestQue.empty()) {
 				continue;
 			}
-			DbRequest = PopQueryRequest();
+			//DbRequest = PopQueryRequest();//락이 두번 잡힘
+			DbRequest = RequestQue.front();
+			RequestQue.pop_front();
+
 		}
 
 		if (DBRequestMap.find(DbRequest.PacketId) != DBRequestMap.end())
@@ -143,7 +147,7 @@ void DBManager::SetDBResult(DB_Request& DRequest, bool IsSuccess)
 bool DBManager::LoginReq(ConnectionManager& Connection, DB_Request& DRequest)
 {
 	LoginPacket* Loginpacket = (LoginPacket*)(DRequest.pData);
-	bool IsSuccess = Connection.LoginRequest(Loginpacket->UserName, Loginpacket->UserPW);
+	bool IsSuccess = Connection.LoginRequest(Loginpacket->UserName, Loginpacket->UserPW, Loginpacket->NameSize, Loginpacket->PWSize);
 	return IsSuccess;
 }
 
