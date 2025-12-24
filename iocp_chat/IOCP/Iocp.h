@@ -6,7 +6,8 @@
 #include <atomic>
 #include <mutex>
 #include <deque>
-#define MAX_WORKERTHREAD 4  //쓰레드 풀에 넣을 쓰레드 수
+#include <atomic>
+#define MAX_WORKERTHREAD 6  //쓰레드 풀에 넣을 쓰레드 수
 
 class IocpServer
 {
@@ -27,6 +28,8 @@ public:
 		return mClientInfos[idx];
 	}
 	void StopServer() { DestroyThread(); OnStopServer(); };
+
+	UINT32 GetLostSendPacekt() { UINT32 ReturnValue = LostCount.load(); LostCount.store(0); return ReturnValue; };
 protected:
 	//가상 함수 선언
 	virtual void OnConnect(UINT32 idx) {};
@@ -52,7 +55,10 @@ private:
 	void CreateAccepterThread();
 	//send 스레드 생성
 	void CreateSendPacketThread();//send는 네트워크쪽이 아니라 애플리케이션단에서 전송하게해야함 따라서 이 함수는 추후 삭제해야함
+	//lostcount 스레드 생성
+	void CreateLostCountThread();
 
+	void LostPacketThread();
 
 	//워커스레드
 	void WorkerThread();
@@ -90,6 +96,7 @@ private:
 	bool mIsWorkerRun = true;
 	bool mIsAcceptRun = true;
 	bool PacketProcessRun = true;
+	bool LostCounterRun = true;
 
 	//클라이언트 정보 배열
 	std::vector<ClientInfo*> mClientInfos;
@@ -99,6 +106,8 @@ private:
 	std::thread mAccepterThread;
 	//Send 스레드
 	std::thread mSendPacket;
+	//lost 스레드
+	std::thread mLostCountThread;
 
 	//클라이언트의 접속을 받기위한 리슨 소켓
 	SOCKET mListenSocket = INVALID_SOCKET;
@@ -117,4 +126,5 @@ private:
 	std::mutex EmptySocketQueLock;//클라이언트구조체 lock
 	std::condition_variable RecvPacketCV; // 생산자 소비자를 위한 CV
 
+	std::atomic<UINT32> LostCount{ 0 };
 };

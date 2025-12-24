@@ -30,7 +30,7 @@ void ChatServer::Start(UINT32 MaxClientCnt)
 
 	SetDBManager();
 	CreateDBResultThread();
-	CreatePacketResultThread(2);
+	CreatePacketResultThread();
 	ClientManager.BindResultQue(&RQueManager);
 	CreateTPSThread();
 }
@@ -107,7 +107,7 @@ void ChatServer::CalcTPSThread()
 {
 	while (CalcTPSThreadRun)
 	{
-		printf("처리량 : %lld 손실량 : %lld\n", Throughput.load(), LostPacketCount.load());
+		printf("처리량 : %lld 수신 손실량 : %lld 전송 손실량 : %d\n", Throughput.load(), LostPacketCount.load(), GetLostSendPacekt());
 		Throughput.store(0);
 		LostPacketCount.store(0);
 		std::this_thread::sleep_for(std::chrono::milliseconds(1000));//1초마다 측정

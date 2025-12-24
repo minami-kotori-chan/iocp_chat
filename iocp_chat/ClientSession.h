@@ -53,6 +53,39 @@ struct ClientSession
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		if (BufDataSize + pDataSize > MAX_SEESION_BUFSIZE) return false;
+
+		// 현재 Tail 위치에서 버퍼 끝까지 남은 공간 계산
+		int spaceAtEnd = MAX_SEESION_BUFSIZE - BufTail;
+
+		if (pDataSize <= spaceAtEnd)
+		{
+			//뒤쪽 공간이 충분함
+			CopyMemory(&SessionRecvBuf[BufTail], pData, pDataSize);
+
+			BufTail += pDataSize;
+
+			//Tail이 끝에 도달했으면 0으로
+			if (BufTail == MAX_SEESION_BUFSIZE) BufTail = 0;
+		}
+		else
+		{
+			//뒤쪽 공간이 부족함 두 번 나누어 복사 (끝부분 + 앞부분)
+
+			//뒷부분 채우기 (BufTail부터 버퍼 끝)
+			CopyMemory(&SessionRecvBuf[BufTail], pData, spaceAtEnd);
+
+			//남은 앞부분 채우기 (인덱스 0부터 나머지)
+			int remainSize = pDataSize - spaceAtEnd;
+			CopyMemory(&SessionRecvBuf[0], pData + spaceAtEnd, remainSize);
+
+			//Tail 위치 갱신 (앞부분에 쓴 만큼 이동)
+			BufTail = remainSize;
+		}
+		// 데이터 총량 증가
+		BufDataSize += pDataSize;
+
+		return true;
+		/*
 		if (BufTail + pDataSize >= MAX_SEESION_BUFSIZE)
 		{
 			if (BufDataSize != 0) {
@@ -69,6 +102,7 @@ struct ClientSession
 		BufTail += pDataSize;
 		BufDataSize += pDataSize;
 		return true;
+		*/
 	}
 
 	void SetSystemDataOnBuf(PACKET_ID pId)//락필요
@@ -82,6 +116,56 @@ struct ClientSession
 	LPacket GetDataOnBuf()//락필요
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		//헤더 크기만큼 데이터가 있는지 확인
+		if (BufDataSize < sizeof(PacketHead)) {
+			return LPacket(); // 데이터 부족
+		}
+		PacketHead header;
+		int spaceAtEnd = MAX_SEESION_BUFSIZE - BufHead; // 현재 Head에서 끝까지 남은 크기
+
+		if (spaceAtEnd >= sizeof(PacketHead)) {
+			// 헤더가 연속된 공간에 있으면 바로 복사
+			CopyMemory(&header, &SessionRecvBuf[BufHead], sizeof(PacketHead));
+		}
+		else {
+			// 헤더가 끊겨 있으면 조립해서 복사
+			CopyMemory(&header, &SessionRecvBuf[BufHead], spaceAtEnd);
+			CopyMemory((char*)&header + spaceAtEnd, &SessionRecvBuf[0], sizeof(PacketHead) - spaceAtEnd);
+		}
+		LPacket pInfo;
+		pInfo.PacketId = header.PacketId;
+		pInfo.PacketSize = header.PacketSize;
+		pInfo.ClientIdx = ClientIdx;
+		//pInfo.pData = &SessionRecvBuf[BufHead];//호환성을 위해 남겨둠
+		// 데이터가 끊겨 있는지 확인
+		if (spaceAtEnd >= header.PacketSize)
+		{
+			// CASE A: 데이터가 연속되어 있음 (한 번에 복사)
+			CopyMemory(pInfo.pData, &SessionRecvBuf[BufHead], header.PacketSize);
+
+			// Head 이동
+			BufHead += header.PacketSize;
+			// 정확히 끝에 도달했으면 0으로 (SetData와 동일한 로직)
+			if (BufHead == MAX_SEESION_BUFSIZE) BufHead = 0;
+		}
+		else
+		{
+			// CASE B: 데이터가 끝과 처음에 나뉘어 있음 (두 번 복사)
+			// 1) 뒷부분 복사
+			CopyMemory(pInfo.pData, &SessionRecvBuf[BufHead], spaceAtEnd);
+			// 2) 앞부분 복사
+			CopyMemory(pInfo.pData + spaceAtEnd, &SessionRecvBuf[0], header.PacketSize - spaceAtEnd);
+
+			// Head 이동 (앞부분만큼 이동한 위치가 됨)
+			BufHead = header.PacketSize - spaceAtEnd;
+		}
+
+		// 6. 데이터 크기 차감
+		BufDataSize -= header.PacketSize;
+		
+		return pInfo;
+		/*
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		PacketHead* pHead = (PacketHead*)(&SessionRecvBuf[BufHead]);
 		if (BufDataSize == 0 || pHead->PacketSize == 0) {
 			return LPacket();
@@ -92,10 +176,14 @@ struct ClientSession
 		pInfo.pData = &SessionRecvBuf[BufHead];
 		pInfo.ClientIdx = ClientIdx;
 
+		CopyMemory(&pInfo.PData, &SessionRecvBuf[BufHead],pHead->PacketSize);
+
 		BufHead += pHead->PacketSize;
 		BufDataSize -= pHead->PacketSize;
 		return pInfo;
+		*/
 	}
+
 	UINT32 GetUserRoomId()//읽기만 하니까 sharedlock으로
 	{
 		std::shared_lock<std::shared_mutex> lock(ClientSessionLock);
@@ -211,7 +299,7 @@ public:
 		RQueManager = RManager;
 	}
 private:
-	void CreateProcessThreads(UINT32 ThreadCnt=8)
+	void CreateProcessThreads(UINT32 ThreadCnt=14)
 	{
 		for (UINT32 i = 0; i < ThreadCnt; i++) {
 			ProcessRecvPacketThreads.emplace_back([this]() {ProcessRecvPacket(); });
@@ -232,7 +320,7 @@ private:
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
 	{
-		while (RecvPacketThreadRun)
+		/*while (RecvPacketThreadRun)
 		{
 			LPacket packet;
 			bool IsValid = false;
@@ -244,12 +332,27 @@ private:
 				if (RecvPacketThreadRun == false) break;
 
 				if (!RecvPacketQueue.empty()){
-					packet = PopRecvPacket();
+					//packet = PopRecvPacket();
 					IsValid = true;
 				}
 
 			}
 			if(IsValid) PacketProcess(packet);
+		}*/
+		while (RecvPacketThreadRun)
+		{
+			LPacket packet = [this]() -> LPacket {
+				std::unique_lock<std::mutex> lock(RecvPacketQueLock);
+
+				RecvPacketCV.wait(lock, [this] { return !RecvPacketQueue.empty() || !RecvPacketThreadRun; });
+
+				if (!RecvPacketThreadRun || RecvPacketQueue.empty()) {
+					return LPacket();
+				}
+
+				return PopRecvPacket();
+			}(); //RVO를 위해 람다로 작성
+			PacketProcess(packet);
 		}
 	}
 
@@ -260,7 +363,7 @@ private:
 		{
 			(this->*(RecvPacketFuncMap[(int)(packet.PacketId)]))(packet);//함수포인터 코드 iter로 바꾸는게 나을수도 있을듯
 		}
-		else 
+		else
 		{
 			//식별할 수 없는 패킷 id
 			printf("수신한 식별 불가능한 패킷 ID : %d\n", packet.PacketId);
@@ -322,13 +425,14 @@ private:
 		SendPacket.PacketId = NewUserEnter.PacketId;
 		SendPacket.PacketSize = NewUserEnter.PacketSize;
 		SendPacket.ClientIdx = packet.ClientIdx;
-		SendPacket.pData = (char*) &NewUserEnter;
+		//SendPacket.pData = (char*) &NewUserEnter;
+		CopyMemory(SendPacket.pData, &NewUserEnter,sizeof(NewUserEnter));
 		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 
 		
 	}
 	void OnExitRoom(LPacket& packet)
-	{
+	{ 
 		bool Success = roomManager.LeaveRoom(packet.ClientIdx, ClientSessions[packet.ClientIdx]->GetUserRoomId());
 		if (Success == false) return;
 		ClientSessions[packet.ClientIdx]->ExitRoom();
@@ -342,7 +446,8 @@ private:
 		SendPacket.PacketId = NewUserEnter.PacketId;
 		SendPacket.PacketSize = NewUserEnter.PacketSize;
 		SendPacket.ClientIdx = packet.ClientIdx;
-		SendPacket.pData = (char*)&NewUserEnter;
+		//SendPacket.pData = (char*)&NewUserEnter;
+		CopyMemory(SendPacket.pData, &NewUserEnter, sizeof(NewUserEnter));
 		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
 	

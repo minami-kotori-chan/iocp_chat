@@ -53,7 +53,8 @@ struct LPacket {//패킷정보랑 실제 데이터의 주소를 저장하는 구조체 실제 데이터부�
 	PACKET_ID PacketId= PACKET_ID::INVALID;
 	UINT16 PacketSize;
 	UINT32 ClientIdx;
-	char* pData;
+	//char* pData;
+	char pData[MAX_PACKET_SIZE];
 };
 struct LPacketResult : LPacket {
 	bool Success;

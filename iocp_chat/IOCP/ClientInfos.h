@@ -5,7 +5,7 @@
 #include <Ws2tcpip.h>
 #include <mswsock.h>
 #include <mutex>
-
+#include <atomic>
 
 #define MAX_SOCKBUF 1024//최대 버퍼 크기
 
@@ -36,7 +36,7 @@ struct ClientInfo
 	OverlappedEx AcceptOverlappedEx;//접속용 overlap io 변수
 	SOCKADDR_IN ClientAddr;
 
-	
+	std::atomic<UINT32>* LostCount;
 
 	int nAddrLen;
 	bool Isconnected;//연결 상태
@@ -75,6 +75,12 @@ struct ClientInfo
 	void SetSendData(UINT32 ClientId,char *pData,UINT16 DataSize)
 	{
 		std::lock_guard<std::mutex> Lock(IsSendBufLock);
+		if (SendTail - SendHead + DataSize > sizeof(SendBuf)) {
+			if(LostCount) (*LostCount)++;
+
+			return;
+		}
+
 		if (SendTail + DataSize > sizeof(SendBuf)) {//공간이 모자라면 쌓여있는 버퍼를 처음으로 옮겨서 씀 만약 그래도 모자라다면 버퍼오버플로우가 나므로 클라이언트를 연결해제시킬것(정상적인 경우 버퍼가 모자랄수없음)
 			if (SendTail - SendHead == 0) {
 				SendHead = 0;
@@ -87,6 +93,7 @@ struct ClientInfo
 			}
 			
 		}
+		
 		CopyMemory(&SendBuf[SendTail], pData, DataSize);
 		SendTail += DataSize;
 

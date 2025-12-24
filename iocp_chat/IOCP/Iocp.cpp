@@ -60,7 +60,7 @@ bool IocpServer::StartServer(const UINT32 maxClientCount)
 
 	CreateWorkThread();//워커스레드 생성
 	CreateAccepterThread();//접속용 스레드 생성
-
+	CreateLostCountThread();
 
 	Start(maxClientCount);
 	printf("\n서버실행완료\n");
@@ -99,6 +99,24 @@ void IocpServer::CreateAccepterThread()
 {
 	mAccepterThread = std::thread([this]() {AccepterThread(); });
 	printf("AccepterThread 시작..\n");
+}
+
+void IocpServer::CreateLostCountThread()
+{
+	for (auto& i : mClientInfos) {
+		i->LostCount = &LostCount;
+	}
+	//mLostCountThread = std::thread([this]() {LostPacketThread(); });
+	
+}
+
+void IocpServer::LostPacketThread()
+{
+	while (LostCounterRun) {
+		printf("lost패킷 수 : %d\n", LostCount.load());
+		LostCount.store(0);
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	}
 }
 
 void IocpServer::WorkerThread()
@@ -152,7 +170,7 @@ void IocpServer::WorkerThread()
 
 		//recv 결과 처리
 		if (pOverlappedEx->Operation == IOOperation::RECV) {
-			pClientInfo->RecvBuf[dwIoSize] = 0;//소켓에서 버퍼에 쓰는 결과에는 널문자가 들어가지 않아서 직접 써줘야함(문자열인 경우)
+			//pClientInfo->RecvBuf[dwIoSize] = 0;//소켓에서 버퍼에 쓰는 결과에는 널문자가 들어가지 않아서 직접 써줘야함(문자열인 경우)
 			//printf("수신한 문자열 : %s ", &(pClientInfo->RecvBuf[5]));//패킷헤더 구조상 5번째부터 문자열이기 때문에 5번째부터 출력(테스트용 코드임)
 			OnRecv(pClientInfo->idx, pClientInfo->RecvBuf, dwIoSize);//가상함수호출
 
@@ -356,6 +374,11 @@ void IocpServer::DestroyThread()
 		mAccepterThread.join();
 	}
 	EmptySocketQue.clear();//accept 큐 비움
+	LostCounterRun = false;
+	if (mLostCountThread.joinable())
+	{
+		mLostCountThread.join();
+	}
 
 	closesocket(mListenSocket);
 }
