@@ -22,6 +22,7 @@ public:
 		std::lock_guard<std::shared_mutex> lock(UserHashLock);
 		if (EnterUsers.size() == MaxEnterSize) return false;
 		EnterUsers.insert(UserIdx);
+		return true;
 	}
 	bool LeaveRoom(UINT32 UserIdx)
 	{
@@ -61,8 +62,10 @@ public:
 		for(const auto& i : UserCopy){
 			MessageSender->SendData(i,pData.pData, pData.PacketSize);//직접전송
 		}*/
+		NoticeNewUserEnterGame* tmp = (NoticeNewUserEnterGame*)(pData.pData);
 		for (UINT32 i = 0; i < totaluser; i++) {
 			MessageSender->SendData(UserCopy[i], pData.pData, pData.PacketSize);
+			
 		}
 		
 	}

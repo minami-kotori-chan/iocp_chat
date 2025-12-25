@@ -49,7 +49,6 @@ struct ClientSession
 		BufTail = 0;
 		BufDataSize = 0;
 		UserName.reserve(MAX_USERNAME_LENGTH);
-		Cdata.SetRandomForTest();//랜덤 초기화
 	}
 
 	bool SetDataOnBuf(char *pData, UINT16 pDataSize)//락필요
@@ -480,11 +479,11 @@ private:
 		EnterRoomPacket* EnterPacket = (EnterRoomPacket*)packet.pData;
 		bool Success = roomManager.EnterRoom(packet.ClientIdx, EnterPacket->RoomId);
 		ClientSessions[packet.ClientIdx]->EnterRoom(EnterPacket->RoomId);
-		PushLpacketResult(PACKET_ID::ENTER_ROOM_RESPONSE, Success, packet);
+		//PushLpacketResult(PACKET_ID::ENTER_ROOM_RESPONSE, Success, packet);
 		if (Success == false) return;
 		NoticeNewUserEnterGame NewUserEnter;
 		NewUserEnter.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
-		NewUserEnter.PacketSize = sizeof(NoticeNewUserEnter);
+		NewUserEnter.PacketSize = sizeof(NoticeNewUserEnterGame);
 		CopyMemory(NewUserEnter.UserName, ClientSessions[packet.ClientIdx]->UserName.c_str(), ClientSessions[packet.ClientIdx]->UserName.size());
 		NewUserEnter.UserId = packet.ClientIdx;
 		ClientSessions[packet.ClientIdx]->GetLocation(NewUserEnter.PlayerLocate);
@@ -501,9 +500,9 @@ private:
 		ResponsePacket.PacketSize = sizeof(EnterRoomPacketResponse);
 		ResponsePacket.RoomId = EnterPacket->RoomId;
 		ResponsePacket.UserId = packet.ClientIdx;
-		SendData(ResponsePacket.UserId,(char*) & ResponsePacket, ResponsePacket.PacketSize);//방입장 응답 패킷
-
-		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
+		SendData(ResponsePacket.UserId,(char*) & ResponsePacket, ResponsePacket.PacketSize);//방입장 응답 패킷(정상작동)
+		NoticeNewUserEnterGame* tmp = (NoticeNewUserEnterGame*)(SendPacket.pData);
+		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);//(0으로 날아감)
 	}
 	void OnGameRoomExit(LPacket& packet)
 	{
