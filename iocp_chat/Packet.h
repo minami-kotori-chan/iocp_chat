@@ -39,18 +39,20 @@ enum class PACKET_ID : UINT16
 	EXIT_ROOM_REQUEST = 2012,
 	EXIT_ROOM_RESPONSE = 2013,
 
+	GAME_ROOM_ENTER_REQUEST = 2014,
+	GAME_ROOM_ENTER_RESPONSE = 2015,
 
 	NOTICE_ROOM_NEW_USER = 3000,
 	NOTICE_ROOM_EXIT_USER = 3001,
 };
-
+#pragma pack(push, 1)
 struct PacketHead {
 	UINT16 PacketSize;
 	PACKET_ID PacketId;
 };
 
 struct LPacket {//패킷정보랑 실제 데이터의 주소를 저장하는 구조체 실제 데이터부분을 memcpy하는건 비효율적이므로 그냥 포인터로 받기 위해 새로 만든 구조체임
-	PACKET_ID PacketId= PACKET_ID::INVALID;
+	PACKET_ID PacketId = PACKET_ID::INVALID;
 	UINT16 PacketSize;
 	UINT32 ClientIdx;
 	//char* pData;
@@ -61,7 +63,7 @@ struct LPacketResult : LPacket {
 };
 
 struct MessagePacket : PacketHead {
-	char Msg[MAX_PACKET_SIZE-sizeof(PacketHead)];
+	char Msg[MAX_PACKET_SIZE - sizeof(PacketHead)];
 	UINT16 DataSize;
 };
 
@@ -80,6 +82,12 @@ struct GuestPacket : PacketHead {
 	UINT8 NameSize;
 };
 
+struct LoginResult : PacketHead {
+	bool Success;
+	UINT32 UserId;
+	UINT8 NameSize;
+	char UserName[MAX_USERNAME_LENGTH];
+};
 
 struct ResponsePacket : PacketHead {
 	bool Success;
@@ -87,13 +95,35 @@ struct ResponsePacket : PacketHead {
 
 //방 관련 패킷
 
-struct EnterRoomPacket : PacketHead {
+struct EnterRoomPacket : PacketHead {//방 접속 요청
 	UINT32 RoomId;
 };
-struct ExitRoomPacket : PacketHead {
-
+struct EnterRoomPacketResponse : EnterRoomPacket {//방 접속 응답 (방번호+유저번호)
+	UINT32 UserId;
 };
-struct NoticeNewUserEnter : PacketHead {
+struct ExitRoomPacket : PacketHead {//방 나가기 요청
+	UINT32 UserId;
+};
+struct PacketMoveReq : PacketHead {//이동 동기화 패킷 (요청)
+	float x;
+	float y;
+	float z;
+	float Yaw; // 회전값
+};
+struct PacketMoveRes : PacketMoveReq {//이동 동기화 패킷 (응답)
+	UINT32 UserId;
+};
+struct NoticeNewUserEnter : PacketHead {//들어온 유저(유저 아이디없음) 알림
 	char UserName[MAX_USERNAME_LENGTH];
 	UINT8 NameSize;
 };
+struct NoticeNewUserEnterGame : NoticeNewUserEnter {//들어온 유저 알림
+	UINT32 UserId;
+	PacketMoveReq PlayerLocate;
+};
+struct NoticeUserExit : PacketHead {//나간 유저 알림
+	UINT32 UserId;
+};
+
+
+#pragma pack(push, 1)

@@ -149,6 +149,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CharacterData.h" />
     <ClInclude Include="ChatServer.h" />
     <ClInclude Include="ClientSession.h" />
     <ClInclude Include="DBManager.h" />

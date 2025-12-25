@@ -3,6 +3,11 @@
 void ChatServer::OnConnect(UINT32 idx)
 {
 	ClientManager.PushSystemPacket(idx,PACKET_ID::CONNECT_REQUEST);
+	MessagePacket mp;
+	CopyMemory(mp.Msg,"hello",6);
+	mp.PacketId = PACKET_ID::MESSAGE_RESPONSE;
+	mp.PacketSize = sizeof(PacketHead) + 6;
+	SendData(idx, (char*) &mp, mp.PacketSize);
 }
 
 void ChatServer::OnDisConnect(UINT32 idx)

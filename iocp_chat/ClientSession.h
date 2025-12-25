@@ -12,6 +12,7 @@
 #include "ResultQueManager.h"
 #include "RoomManager.h"
 #include "PacketSenderInterface.h"
+#include "CharacterData.h"
 
 enum class ClinetState : UINT16
 {
@@ -27,6 +28,7 @@ struct ClientSession
 {
 	UINT32 ClientIdx;//클라이언트 ID
 	ClinetState CState;
+	CharacterData Cdata;
 
 	char SessionRecvBuf[MAX_SEESION_BUFSIZE];
 
@@ -47,6 +49,7 @@ struct ClientSession
 		BufTail = 0;
 		BufDataSize = 0;
 		UserName.reserve(MAX_USERNAME_LENGTH);
+		Cdata.SetRandomForTest();//랜덤 초기화
 	}
 
 	bool SetDataOnBuf(char *pData, UINT16 pDataSize)//락필요
@@ -220,6 +223,14 @@ struct ClientSession
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		CState = ClinetState::LOGIN;
 	}
+	void GetLocation(PacketMoveReq& Locate)
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		Locate.x = Cdata.x;
+		Locate.y = Cdata.y;
+		Locate.z = Cdata.z;
+		Locate.Yaw = Cdata.Yaw;
+	}
 };
 
 class ClientSessionManager
@@ -242,6 +253,7 @@ public:
 		//room 초기화
 		roomManager.Init();
 		roomManager.SetSender(sender);
+		this->sender = sender;
 	}
 	void SetThroughput(std::atomic<UINT64>& lostpacket)
 	{
@@ -316,6 +328,8 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::ENTER_ROOM_REQUEST] = &ClientSessionManager::OnEnterRoom;
 		RecvPacketFuncMap[(int)PACKET_ID::EXIT_ROOM_REQUEST] = &ClientSessionManager::OnExitRoom;
 		RecvPacketFuncMap[(int)PACKET_ID::GUEST_REQUEST] = &ClientSessionManager::OnGuestLogin;
+		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_ENTER_REQUEST] = &ClientSessionManager::OnGameRoomEnter;
+		
 	}
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
@@ -396,8 +410,18 @@ private:
 	{
 		GuestPacket* LoginP = (GuestPacket*)(packet.pData);
 		ClientSessions[packet.ClientIdx]->OnLogin(LoginP->UserName, LoginP->NameSize);
-		printf("수신 문자열 : %s", &LoginP->UserName);
-		PushLpacketResult(PACKET_ID::GUEST_RESPONSE, true, packet);
+		printf("수신 문자열 : %s\n", &LoginP->UserName);
+		//PushLpacketResult(PACKET_ID::GUEST_RESPONSE, true, packet);
+
+		LoginResult loginResult;
+		loginResult.PacketId = PACKET_ID::GUEST_RESPONSE;
+		loginResult.Success = true;
+		loginResult.UserId = packet.ClientIdx;
+		CopyMemory(loginResult.UserName, LoginP->UserName, LoginP->NameSize);
+		loginResult.NameSize = LoginP->NameSize;
+		loginResult.PacketSize = sizeof(LoginResult)- sizeof(loginResult.UserName) + loginResult.NameSize;
+
+		SendData(loginResult.UserId, (char*)&loginResult, loginResult.PacketSize);
 	}
 	void OnLogout(LPacket& packet)
 	{
@@ -450,6 +474,41 @@ private:
 		CopyMemory(SendPacket.pData, &NewUserEnter, sizeof(NewUserEnter));
 		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
+
+	void OnGameRoomEnter(LPacket& packet)
+	{
+		EnterRoomPacket* EnterPacket = (EnterRoomPacket*)packet.pData;
+		bool Success = roomManager.EnterRoom(packet.ClientIdx, EnterPacket->RoomId);
+		ClientSessions[packet.ClientIdx]->EnterRoom(EnterPacket->RoomId);
+		PushLpacketResult(PACKET_ID::ENTER_ROOM_RESPONSE, Success, packet);
+		if (Success == false) return;
+		NoticeNewUserEnterGame NewUserEnter;
+		NewUserEnter.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
+		NewUserEnter.PacketSize = sizeof(NoticeNewUserEnter);
+		CopyMemory(NewUserEnter.UserName, ClientSessions[packet.ClientIdx]->UserName.c_str(), ClientSessions[packet.ClientIdx]->UserName.size());
+		NewUserEnter.UserId = packet.ClientIdx;
+		ClientSessions[packet.ClientIdx]->GetLocation(NewUserEnter.PlayerLocate);
+		
+		LPacket SendPacket;
+		SendPacket.PacketId = NewUserEnter.PacketId;
+		SendPacket.PacketSize = NewUserEnter.PacketSize;
+		SendPacket.ClientIdx = packet.ClientIdx;
+		//SendPacket.pData = (char*) &NewUserEnter;
+		CopyMemory(SendPacket.pData, &NewUserEnter, sizeof(NewUserEnter));
+
+		EnterRoomPacketResponse ResponsePacket;
+		ResponsePacket.PacketId = PACKET_ID::GAME_ROOM_ENTER_RESPONSE;
+		ResponsePacket.PacketSize = sizeof(EnterRoomPacketResponse);
+		ResponsePacket.RoomId = EnterPacket->RoomId;
+		ResponsePacket.UserId = packet.ClientIdx;
+		SendData(ResponsePacket.UserId,(char*) & ResponsePacket, ResponsePacket.PacketSize);//방입장 응답 패킷
+
+		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
+	}
+	void OnGameRoomExit(LPacket& packet)
+	{
+
+	}
 	
 	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
 	{
@@ -467,6 +526,13 @@ private:
 		UINT32 idx = RecvPacketQueue.front();
 		RecvPacketQueue.pop_front();
 		return ClientSessions[idx]->GetDataOnBuf();
+	}
+
+	__inline void SendData(UINT32 idx, char* pData, int Psize)
+	{
+		if (sender){
+			sender->SendData(idx, pData, Psize);
+		}
 	}
 
 	bool RecvPacketThreadRun = true;
@@ -488,4 +554,6 @@ private:
 	RoomManager roomManager;
 	std::atomic<UINT64>* LostPacketCountPtr=nullptr;
 	std::atomic<UINT64>* Throughput=nullptr;
+
+	PacketSenderInterface* sender=nullptr;
 };
