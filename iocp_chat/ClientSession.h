@@ -328,6 +328,7 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::EXIT_ROOM_REQUEST] = &ClientSessionManager::OnExitRoom;
 		RecvPacketFuncMap[(int)PACKET_ID::GUEST_REQUEST] = &ClientSessionManager::OnGuestLogin;
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_ENTER_REQUEST] = &ClientSessionManager::OnGameRoomEnter;
+		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_EXIT_REQUEST] = &ClientSessionManager::OnGameRoomExit;
 		
 	}
 
@@ -506,7 +507,22 @@ private:
 	}
 	void OnGameRoomExit(LPacket& packet)
 	{
+		bool Success = roomManager.LeaveRoom(packet.ClientIdx, ClientSessions[packet.ClientIdx]->GetUserRoomId());
+		if (Success == false) return;
+		ClientSessions[packet.ClientIdx]->ExitRoom();
+		PushLpacketResult(PACKET_ID::EXIT_ROOM_RESPONSE, true, packet);//룸에 자기자신이 없기때문에 알려야함
 
+		NoticeUserExit NewUserExit;
+		NewUserExit.PacketId = PACKET_ID::NOTICE_ROOM_EXIT_USER;
+		NewUserExit.PacketSize = sizeof(NoticeUserExit);
+		NewUserExit.UserId = packet.ClientIdx;
+		LPacket SendPacket;
+		SendPacket.PacketId = NewUserExit.PacketId;
+		SendPacket.PacketSize = NewUserExit.PacketSize;
+		SendPacket.ClientIdx = packet.ClientIdx;
+		//SendPacket.pData = (char*)&NewUserEnter;
+		CopyMemory(SendPacket.pData, &NewUserExit, sizeof(NewUserExit));
+		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
 	
 	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
