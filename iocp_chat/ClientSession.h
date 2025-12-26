@@ -234,8 +234,8 @@ struct ClientSession
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		Cdata.x = Locate.x;
-		Cdata.x = Locate.x;
-		Cdata.x = Locate.x;
+		Cdata.y = Locate.y;
+		Cdata.z = Locate.z;
 		Cdata.Yaw = Locate.Yaw;
 	}
 };
@@ -431,7 +431,7 @@ private:
 				}
 			}
 
-			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	}
 
