@@ -230,6 +230,14 @@ struct ClientSession
 		Locate.z = Cdata.z;
 		Locate.Yaw = Cdata.Yaw;
 	}
+	void SetLocation(PacketMoveReq& Locate)
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		Cdata.x = Locate.x;
+		Cdata.x = Locate.x;
+		Cdata.x = Locate.x;
+		Cdata.Yaw = Locate.Yaw;
+	}
 };
 
 class ClientSessionManager
@@ -295,6 +303,9 @@ public:
 			}
 		}
 		RecvPacketQueue.clear();
+		SendLocateThreadRun=false;
+		if(SendLocateThreads.joinable()) SendLocateThreads.join();
+
 	}
 	void SetDelegate(DelegateManager<void, LPacket&>* pDM)
 	{
@@ -315,6 +326,7 @@ private:
 		for (UINT32 i = 0; i < ThreadCnt; i++) {
 			ProcessRecvPacketThreads.emplace_back([this]() {ProcessRecvPacket(); });
 		}
+		SendLocateThreads = std::thread([this]() {SendLocateData(); });
 	}
 
 	void BindFunc()//함수포인터 바인딩
@@ -329,6 +341,7 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::GUEST_REQUEST] = &ClientSessionManager::OnGuestLogin;
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_ENTER_REQUEST] = &ClientSessionManager::OnGameRoomEnter;
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_EXIT_REQUEST] = &ClientSessionManager::OnGameRoomExit;
+		RecvPacketFuncMap[(int)PACKET_ID::UNIT_MOVING_DATA_REQUEST] = &ClientSessionManager::OnMovingData;
 		
 	}
 
@@ -385,6 +398,40 @@ private:
 			{
 				(*LostPacketCountPtr)++;
 			}
+		}
+	}
+
+	void SendLocateData()
+	{
+		while (SendLocateThreadRun)
+		{
+			for (UINT32 i = 0; i < MAX_ROOM_COUNT; i++) 
+			{
+				UINT32 UserList[MAX_ENTER_USER_COUNT];
+				UINT32 UserSize;
+
+				char PacektBuffer[MAX_ENTER_USER_COUNT*sizeof(PacketMoveRes)];
+				UINT32 BufferTail = 0;
+				roomManager.GetRoomUserList(i, (char*)UserList, UserSize);
+
+				PacketMoveRes UserLocate;
+				UserLocate.PacketId = PACKET_ID::UNIT_MOVING_DATA_RESPONSE;
+				UserLocate.PacketSize = sizeof(PacketMoveRes);
+
+				for (UINT32 j = 0; j < UserSize; j++) {
+					
+					UserLocate.UserId = ClientSessions[UserList[j]]->ClientIdx;
+					ClientSessions[UserList[j]]->GetLocation(UserLocate);
+					CopyMemory(&PacektBuffer[BufferTail],&UserLocate,sizeof(PacketMoveRes));
+					BufferTail += sizeof(PacketMoveRes);
+				}
+				
+				for (UINT32 j = 0; j < UserSize; j++) {
+					SendData(UserList[j],(char*)&PacektBuffer,BufferTail);
+				}
+			}
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 	}
 
@@ -502,8 +549,24 @@ private:
 		ResponsePacket.RoomId = EnterPacket->RoomId;
 		ResponsePacket.UserId = packet.ClientIdx;
 		SendData(ResponsePacket.UserId,(char*) & ResponsePacket, ResponsePacket.PacketSize);//방입장 응답 패킷(정상작동)
-		NoticeNewUserEnterGame* tmp = (NoticeNewUserEnterGame*)(SendPacket.pData);
-		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);//(0으로 날아감)
+
+		//기존 유저 목록을 입장자에게 넘기는 코드
+		UINT32 UserList[MAX_ENTER_USER_COUNT];
+		UINT32 UserSize;
+		roomManager.GetRoomUserList(EnterPacket->RoomId,(char*)UserList,UserSize);
+
+		NoticeNewUserEnterGame OldUser;
+		OldUser.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
+		OldUser.PacketSize = sizeof(NoticeNewUserEnterGame);
+
+		for (UINT32 i = 0; i < UserSize; i++) {//지금은 이런식으로 구현해두었지만 추후에는 100명씩 끊어서 버퍼에 담아서 한번에 주는 방식으로 구현하자
+			OldUser.UserId = UserList[i];
+			CopyMemory(OldUser.UserName, ClientSessions[UserList[i]]->UserName.c_str(), ClientSessions[UserList[i]]->UserName.size());
+			ClientSessions[UserList[i]]->GetLocation(OldUser.PlayerLocate);
+			SendData(SendPacket.ClientIdx, (char*)&OldUser, OldUser.PacketSize);
+		}
+
+		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
 	void OnGameRoomExit(LPacket& packet)
 	{
@@ -524,7 +587,12 @@ private:
 		CopyMemory(SendPacket.pData, &NewUserExit, sizeof(NewUserExit));
 		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
-	
+	void OnMovingData(LPacket& packet)
+	{
+		PacketMoveReq* Locate = (PacketMoveReq*)packet.pData;
+		ClientSessions[packet.ClientIdx]->SetLocation(*Locate);
+
+	}
 	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
 	{
 		LPacketResult Rpacket;
@@ -551,6 +619,7 @@ private:
 	}
 
 	bool RecvPacketThreadRun = true;
+	bool SendLocateThreadRun = true;
 	std::vector<ClientSession*> ClientSessions;
 
 	std::deque<UINT32> RecvPacketQueue;//동적할당이라서 불리하긴하지만 한번에 4바이트이니까 큰 오버헤드까지는 아니라고 생각함
@@ -558,6 +627,7 @@ private:
 	std::unordered_map<int, void (ClientSessionManager::* )(LPacket&)> RecvPacketFuncMap;//함수포인터 문법은 알다가도 모르겠다.
 
 	std::vector<std::thread> ProcessRecvPacketThreads;
+	std::thread SendLocateThreads;
 
 	std::mutex RecvPacketQueLock;//RecvQue 락
 	std::condition_variable RecvPacketCV; // 생산자 소비자를 위한 CV;

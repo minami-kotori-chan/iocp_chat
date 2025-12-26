@@ -47,6 +47,10 @@ enum class PACKET_ID : UINT16
 
 	NOTICE_ROOM_NEW_USER = 3000,
 	NOTICE_ROOM_EXIT_USER = 3001,
+
+	UNIT_MOVING_DATA_REQUEST = 4000,
+	UNIT_MOVING_DATA_RESPONSE = 4001,
+
 };
 #pragma pack(push, 1)
 struct PacketHead {
@@ -60,6 +64,13 @@ struct LPacket {//패킷정보랑 실제 데이터의 주소를 저장하는 구조체 실제 데이터부�
 	UINT32 ClientIdx;
 	//char* pData;
 	char pData[MAX_PACKET_SIZE];
+};
+struct LpPacket {//LPacket포인터버전(큐에 넣고 뺄때 아니면 굳이 복사 안해도 되니까)
+	PACKET_ID PacketId = PACKET_ID::INVALID;
+	UINT16 PacketSize;
+	UINT32 ClientIdx;
+	char* pData;
+	//char pData[MAX_PACKET_SIZE];
 };
 struct LPacketResult : LPacket {
 	bool Success;

@@ -7,6 +7,7 @@
 #include "PacketSenderInterface.h"
 
 #define MAX_ENTER_USER_COUNT 1024
+#define MAX_ROOM_COUNT 100
 
 class ChatRoom
 {
@@ -18,7 +19,6 @@ public:
 
 	bool EnterRoom(UINT32 UserIdx)
 	{
-		
 		std::lock_guard<std::shared_mutex> lock(UserHashLock);
 		if (EnterUsers.size() == MaxEnterSize) return false;
 		EnterUsers.insert(UserIdx);
@@ -36,6 +36,21 @@ public:
 		std::shared_lock<std::shared_mutex> lock(UserHashLock);
 		if (EnterUsers.find(UserIdx) != EnterUsers.end()) return true;
 		return false;
+	}
+
+	bool GetEnterRoomClientList(char* UserListArray,UINT32& UserSize)
+	{
+		UINT32* UserCopy = (UINT32*)UserListArray;
+		{
+			std::shared_lock<std::shared_mutex> lock(UserHashLock);
+			int ArrayCount = 0;
+			UserSize = EnterUsers.size();
+			for (const auto& i : EnterUsers) {
+				UserCopy[ArrayCount] = i;
+				ArrayCount++;
+			}
+		}
+		return true;
 	}
 
 	void BroadCastAllRoomUser(PacketSenderInterface* MessageSender,LPacket& pData)
@@ -80,7 +95,7 @@ private:
 class RoomManager
 {
 public:
-	void Init(UINT32 RoomsCount=100)
+	void Init(UINT32 RoomsCount=MAX_ROOM_COUNT)
 	{
 		for (UINT32 i = 0; i < RoomsCount; i++) {
 			Rooms.emplace_back(new ChatRoom());
@@ -116,6 +131,12 @@ public:
 		if (RoomId < Rooms.size()) {
 			Rooms[RoomId]->BroadCastAllRoomUser(MessageSender,pData);
 			//printf("%d번방 송신 완료", RoomId);
+		}
+	}
+	void GetRoomUserList(UINT32 RoomId,char* UserList,UINT32& UserSize)
+	{
+		if (RoomId < Rooms.size()) {
+			Rooms[RoomId]->GetEnterRoomClientList(UserList, UserSize);
 		}
 	}
 private:
