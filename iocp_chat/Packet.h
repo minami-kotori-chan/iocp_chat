@@ -53,6 +53,7 @@ enum class PACKET_ID : UINT16
 
 };
 #pragma pack(push, 1)
+
 struct PacketHead {
 	UINT16 PacketSize;
 	PACKET_ID PacketId;
@@ -124,7 +125,11 @@ struct PacketMoveReq : PacketHead {//이동 동기화 패킷 (요청)
 	float z;
 	float Yaw; // 회전값
 };
-struct PacketMoveRes : PacketMoveReq {//이동 동기화 패킷 (응답)
+struct PacketMoveReqWithState : PacketMoveReq {//이동 동기화 패킷 (요청) (상태 추가)
+	UINT8 State;
+};
+
+struct PacketMoveRes : PacketMoveReqWithState {//이동 동기화 패킷 (응답)
 	UINT32 UserId;
 };
 struct NoticeNewUserEnter : PacketHead {//들어온 유저(유저 아이디없음) 알림

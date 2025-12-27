@@ -230,6 +230,15 @@ struct ClientSession
 		Locate.z = Cdata.z;
 		Locate.Yaw = Cdata.Yaw;
 	}
+	void GetLocation(PacketMoveReqWithState& Locate)
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		Locate.x = Cdata.x;
+		Locate.y = Cdata.y;
+		Locate.z = Cdata.z;
+		Locate.Yaw = Cdata.Yaw;
+		Locate.State = Cdata.State;
+	}
 	void SetLocation(PacketMoveReq& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
@@ -237,6 +246,15 @@ struct ClientSession
 		Cdata.y = Locate.y;
 		Cdata.z = Locate.z;
 		Cdata.Yaw = Locate.Yaw;
+	}
+	void SetLocation(PacketMoveReqWithState& Locate)
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		Cdata.x = Locate.x;
+		Cdata.y = Locate.y;
+		Cdata.z = Locate.z;
+		Cdata.Yaw = Locate.Yaw;
+		Cdata.State = Locate.State;
 	}
 };
 
@@ -421,7 +439,7 @@ private:
 				for (UINT32 j = 0; j < UserSize; j++) {
 					
 					UserLocate.UserId = ClientSessions[UserList[j]]->ClientIdx;
-					ClientSessions[UserList[j]]->GetLocation(UserLocate);
+					ClientSessions[UserList[j]]->GetLocation((PacketMoveReqWithState&)UserLocate);
 					CopyMemory(&PacektBuffer[BufferTail],&UserLocate,sizeof(PacketMoveRes));
 					BufferTail += sizeof(PacketMoveRes);
 				}
@@ -589,9 +607,8 @@ private:
 	}
 	void OnMovingData(LPacket& packet)
 	{
-		PacketMoveReq* Locate = (PacketMoveReq*)packet.pData;
+		PacketMoveReqWithState* Locate = (PacketMoveReqWithState*)packet.pData;
 		ClientSessions[packet.ClientIdx]->SetLocation(*Locate);
-
 	}
 	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
 	{

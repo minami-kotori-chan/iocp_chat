@@ -11,6 +11,8 @@ struct CharacterData
 
 	UINT32 health=100;
 
+    UINT8 State=0;
+
     CharacterData()
     {
         SetRandomForTest();
