@@ -77,14 +77,25 @@ public:
 		for(const auto& i : UserCopy){
 			MessageSender->SendData(i,pData.pData, pData.PacketSize);//流立傈价
 		}*/
-		NoticeNewUserEnterGame* tmp = (NoticeNewUserEnterGame*)(pData.pData);
 		for (UINT32 i = 0; i < totaluser; i++) {
 			MessageSender->SendData(UserCopy[i], pData.pData, pData.PacketSize);
 			
 		}
-		
 	}
+	void BroadCastAllRoomUser(PacketSenderInterface* MessageSender, LpPacket& pData)
+	{
+		UINT32 UserCopy[MAX_ENTER_USER_COUNT];
+		UINT32 totaluser = 0;
+		GetEnterRoomClientList((char*)UserCopy, totaluser);
+		/*
+		for(const auto& i : UserCopy){
+			MessageSender->SendData(i,pData.pData, pData.PacketSize);//流立傈价
+		}*/
+		for (UINT32 i = 0; i < totaluser; i++) {
+			MessageSender->SendData(UserCopy[i], pData.pData, pData.PacketSize);
 
+		}
+	}
 private:
 
 	UINT32 MaxEnterSize = MAX_ENTER_USER_COUNT;
@@ -130,6 +141,13 @@ public:
 	{
 		if (RoomId < Rooms.size()) {
 			Rooms[RoomId]->BroadCastAllRoomUser(MessageSender,pData);
+			//printf("%d锅规 价脚 肯丰", RoomId);
+		}
+	}
+	void BroadCastAllRoomUser(UINT32 RoomId, LpPacket& pData)
+	{
+		if (RoomId < Rooms.size()) {
+			Rooms[RoomId]->BroadCastAllRoomUser(MessageSender, pData);
 			//printf("%d锅规 价脚 肯丰", RoomId);
 		}
 	}

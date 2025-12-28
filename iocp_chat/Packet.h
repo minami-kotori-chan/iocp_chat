@@ -33,6 +33,9 @@ enum class PACKET_ID : UINT16
 	MESSAGE_REQUEST = 2000,
 	MESSAGE_RESPONSE = 2001,
 
+	GAME_MESSAGE_REQUEST = 2002,
+	GAME_MESSAGE_RESPONSE = 2003,
+
 	ENTER_ROOM_REQUEST = 2010,
 	ENTER_ROOM_RESPONSE = 2011,
 
@@ -50,8 +53,8 @@ enum class PACKET_ID : UINT16
 
 	UNIT_MOVING_DATA_REQUEST = 4000,
 	UNIT_MOVING_DATA_RESPONSE = 4001,
-
 };
+
 #pragma pack(push, 1)
 
 struct PacketHead {
@@ -80,6 +83,11 @@ struct LPacketResult : LPacket {
 struct MessagePacket : PacketHead {
 	char Msg[MAX_PACKET_SIZE - sizeof(PacketHead)];
 	UINT16 DataSize;
+};
+
+struct MessagePacketResponse : PacketHead {
+	UINT32 UserId;
+	char Msg[MAX_PACKET_SIZE - sizeof(PacketHead)];
 };
 
 #define MAX_USERNAME_LENGTH 32
@@ -144,5 +152,4 @@ struct NoticeUserExit : PacketHead {//나간 유저 알림
 	UINT32 UserId;
 };
 
-
-#pragma pack(push, 1)
+#pragma pack(pop)

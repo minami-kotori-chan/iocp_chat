@@ -360,6 +360,7 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_ENTER_REQUEST] = &ClientSessionManager::OnGameRoomEnter;
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_EXIT_REQUEST] = &ClientSessionManager::OnGameRoomExit;
 		RecvPacketFuncMap[(int)PACKET_ID::UNIT_MOVING_DATA_REQUEST] = &ClientSessionManager::OnMovingData;
+		RecvPacketFuncMap[(int)PACKET_ID::GAME_MESSAGE_REQUEST] = &ClientSessionManager::OnGameMessage;
 		
 	}
 
@@ -497,6 +498,22 @@ private:
 	{
 
 		roomManager.BroadCastAllRoomUser(ClientSessions[packet.ClientIdx]->GetUserRoomId(), packet);
+		//룸에서 자체적으로 send하므로 큐에 넣을 필요 없음
+	}
+	void OnGameMessage(LPacket& packet)
+	{
+		MessagePacketResponse Packet;
+		Packet.PacketId = PACKET_ID::GAME_MESSAGE_RESPONSE;
+		Packet.PacketSize = packet.PacketSize + sizeof(Packet.UserId);
+		CopyMemory(Packet.Msg, ((MessagePacket*)packet.pData)->Msg, packet.PacketSize-sizeof(PacketHead));
+		Packet.UserId = packet.ClientIdx;
+
+		LpPacket PacketWrap;
+		PacketWrap.PacketSize = Packet.PacketSize;
+		PacketWrap.pData = (char*)& Packet;
+		Packet.Msg[packet.PacketSize - sizeof(PacketHead)] = 0;
+
+		roomManager.BroadCastAllRoomUser(ClientSessions[packet.ClientIdx]->GetUserRoomId(), PacketWrap);
 		//룸에서 자체적으로 send하므로 큐에 넣을 필요 없음
 	}
 	void OnEnterRoom(LPacket& packet)
