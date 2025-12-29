@@ -427,7 +427,7 @@ private:
 			for (UINT32 i = 0; i < MAX_ROOM_COUNT; i++) 
 			{
 				UINT32 UserList[MAX_ENTER_USER_COUNT];
-				UINT32 UserSize;
+				UINT32 UserSize=0;
 
 				char PacektBuffer[MAX_ENTER_USER_COUNT*sizeof(PacketMoveRes)];
 				UINT32 BufferTail = 0;

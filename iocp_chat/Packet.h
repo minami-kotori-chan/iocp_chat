@@ -143,6 +143,9 @@ struct PacketMoveReqWithState : PacketMoveReq {//이동 동기화 패킷 (요청) (상태 �
 struct PacketMoveRes : PacketMoveReqWithState {//이동 동기화 패킷 (응답)
 	UINT32 UserId;
 };
+struct MonsterMovingData : PacketMoveRes {//몬스터 이동동기화 및 스폰 패킷 (이동 동기화 패킷에서 타입만 추가됨)
+	UINT32 MonsterType;
+};
 struct NoticeNewUserEnter : PacketHead {//들어온 유저(유저 아이디없음) 알림
 	char UserName[MAX_USERNAME_LENGTH];
 	UINT8 NameSize;

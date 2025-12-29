@@ -10,6 +10,12 @@ MonsterSpawner::MonsterSpawner()
     InitializePool();
 }
 
+MonsterSpawner::MonsterSpawner(std::atomic<UINT32>* Counter) : ObjectIdCounter(Counter)
+{
+    SetSpawnDataRandom();
+    InitializePool();
+}
+
 MonsterSpawner::MonsterSpawner(SpawnData InData): Data(InData)
 {
     InitializePool();
@@ -29,7 +35,7 @@ void MonsterSpawner::InitializePool()
         Pool[i].SetSpawner(this);
         Pool[i].SetMonsterData(Data.MonsterType);
 
-        Pool[i].ObjectId = ObjectIdCounter->fetch_add(1);
+        Pool[i].ObjectId = ObjectIdCounter->fetch_add(1);//
     }
 }
 
@@ -121,13 +127,13 @@ bool MonsterSpawner::SetMonstersPacket(const char* BufferHead,const char* LastBu
     UINT16 LastSend = 0;
     char* BufferWrite = (char*)BufferHead;
     for (auto i = AliveMonsterArray.begin()+SendStartIndex; i < AliveMonsterArray.end(); ++i, LastSend++) {
-        if (BufferWrite + sizeof(PacketMoveRes) < LastBufferAddress) { SendStartIndex += LastSend; return false; }//쓸 공간이 없으면 false반환
-        PacketMoveRes MonsterPacket;//원래는 player용으로 설계된 패킷구조이긴하나 몬스터를 담아도 크게 문제없을듯함
+        if (BufferWrite + sizeof(MonsterMovingData) > LastBufferAddress) { SendStartIndex += LastSend; return false; }//쓸 공간이 없으면 false반환
+        MonsterMovingData MonsterPacket;//원래는 player용으로 설계된 패킷구조이긴하나 몬스터를 담아도 크게 문제없을듯함
         (*i)->SetPacketData(MonsterPacket);
         memcpy(BufferWrite,&MonsterPacket, MonsterPacket.PacketSize);
         LastSend++;
-        BufferWrite += sizeof(PacketMoveRes);
-        WriteBytes += sizeof(PacketMoveRes);
+        BufferWrite += sizeof(MonsterMovingData);
+        WriteBytes += sizeof(MonsterMovingData);
     }
     
     

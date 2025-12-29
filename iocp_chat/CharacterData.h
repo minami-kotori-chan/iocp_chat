@@ -45,11 +45,11 @@ enum class MonsterState : UINT8 {
     IDLE = 0,
     PATROLL = 1,
     WALK = 2,
-    SPAWNED=1000,
+    SPAWNED=200,
 };
 
 class MonsterSpawner;//순환참조 막기용
-struct PacketMoveRes;
+struct MonsterMovingData;
 
 struct MonsterData : CharacterData
 {
@@ -70,13 +70,14 @@ struct MonsterData : CharacterData
         ActorPoint.x = x;
         ActorPoint.y = y;
         health = 100;
-        State = 1000; // IDLE/WALK/PATROLL
+        State = 200; // IDLE/WALK/PATROLL
         IsSpawned = true;
+
     }
     void OnDead();
 
     // 몬스터 AI/이동 로직 (매 프레임 호출)
     void Update(float DeltaTime);
 
-    void SetPacketData(PacketMoveRes& Packet);
+    void SetPacketData(MonsterMovingData& Packet);
 };

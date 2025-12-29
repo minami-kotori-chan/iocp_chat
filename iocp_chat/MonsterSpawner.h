@@ -16,7 +16,9 @@ struct SpawnData {
 class MonsterSpawner {
 public:
     MonsterSpawner();
+    MonsterSpawner(std::atomic<UINT32>* Counter);
     MonsterSpawner(SpawnData InData);
+    
 
     // 일정 시간마다 호출되어 리스폰 체크
     void Update(float DeltaTime);

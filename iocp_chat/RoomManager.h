@@ -20,8 +20,7 @@ public:
 		RoomMonsterSpawners.reserve(SpawnerSize);//일단 5개로 하고 나중에 랜덤으로 되게 하자
 
 		for (int i = 0; i < SpawnerSize; i++) {
-			RoomMonsterSpawners[i] = new MonsterSpawner();
-			RoomMonsterSpawners[i]->SetObjectIdCounter(ObjectIdCount);
+			RoomMonsterSpawners.push_back(new MonsterSpawner(ObjectIdCount));
 		}
 	}
 
@@ -107,6 +106,8 @@ public:
 
 	void Update(PacketSenderInterface* MessageSender,float DeltaTime)
 	{
+		if (EnterUsers.size() == 0) return;
+		
 		char PacketBuffer[1024];
 		char* BufferTail = PacketBuffer;
 		for (auto* Spawner : RoomMonsterSpawners) {
@@ -115,6 +116,7 @@ public:
 			
 			UINT16 SendIndex=0;
 			UINT32 WriteBytes = 0;
+			
 			while (!(Spawner->SetMonstersPacket(BufferTail, PacketBuffer + sizeof(PacketBuffer), SendIndex, WriteBytes)))//모든 데이터를 날릴때까지 반복
 			{
 				BufferTail += WriteBytes;
