@@ -5,6 +5,7 @@
 #include <shared_mutex>
 #include "Packet.h"
 #include "PacketSenderInterface.h"
+#include "MonsterSpawner.h"
 
 #define MAX_ENTER_USER_COUNT 1024
 #define MAX_ROOM_COUNT 100
@@ -12,9 +13,16 @@
 class ChatRoom
 {
 public:
-	ChatRoom()
+	ChatRoom(std::atomic<UINT32>* ObjectIdCount)
 	{
 		EnterUsers.reserve(MAX_ENTER_USER_COUNT);
+		const UINT8 SpawnerSize = 5;
+		RoomMonsterSpawners.reserve(SpawnerSize);//일단 5개로 하고 나중에 랜덤으로 되게 하자
+
+		for (int i = 0; i < SpawnerSize; i++) {
+			RoomMonsterSpawners[i] = new MonsterSpawner();
+			RoomMonsterSpawners[i]->SetObjectIdCounter(ObjectIdCount);
+		}
 	}
 
 	bool EnterRoom(UINT32 UserIdx)
@@ -96,20 +104,52 @@ public:
 
 		}
 	}
+
+	void Update(PacketSenderInterface* MessageSender,float DeltaTime)
+	{
+		char PacketBuffer[1024];
+		char* BufferTail = PacketBuffer;
+		for (auto* Spawner : RoomMonsterSpawners) {
+			Spawner->Update(DeltaTime);
+
+			
+			UINT16 SendIndex=0;
+			UINT32 WriteBytes = 0;
+			while (!(Spawner->SetMonstersPacket(BufferTail, PacketBuffer + sizeof(PacketBuffer), SendIndex, WriteBytes)))//모든 데이터를 날릴때까지 반복
+			{
+				BufferTail += WriteBytes;
+				LpPacket packet;
+				packet.PacketSize = BufferTail - PacketBuffer;
+				packet.pData = PacketBuffer;
+				BroadCastAllRoomUser(MessageSender, packet);
+				BufferTail = PacketBuffer;
+			}
+			BufferTail += WriteBytes;
+		}
+		if (PacketBuffer != BufferTail) {
+			LpPacket packet;
+			packet.PacketSize = BufferTail - PacketBuffer;
+			packet.pData = PacketBuffer;
+			BroadCastAllRoomUser(MessageSender, packet);
+			BufferTail = PacketBuffer;
+		}
+	}
+
 private:
 
 	UINT32 MaxEnterSize = MAX_ENTER_USER_COUNT;
-	std::shared_mutex UserHashLock;
+	std::shared_mutex UserHashLock; 
 	std::unordered_set<UINT32> EnterUsers;
+	std::vector<MonsterSpawner*> RoomMonsterSpawners;
 };
 
 class RoomManager
 {
 public:
-	void Init(UINT32 RoomsCount=MAX_ROOM_COUNT)
+	void Init(UINT32 RoomsCount = MAX_ROOM_COUNT)
 	{
 		for (UINT32 i = 0; i < RoomsCount; i++) {
-			Rooms.emplace_back(new ChatRoom());
+			Rooms.emplace_back(new ChatRoom(&ObjectIdCount));
 		}
 	}
 	void SetSender(PacketSenderInterface* Sender)
@@ -157,9 +197,16 @@ public:
 			Rooms[RoomId]->GetEnterRoomClientList(UserList, UserSize);
 		}
 	}
+	void OnUpdateAllRoom(float DeltaTime)
+	{
+		for (auto* Room : Rooms) {
+			Room->Update(MessageSender,DeltaTime);
+		}
+	}
 private:
 
 
 	PacketSenderInterface* MessageSender;
 	std::vector<ChatRoom*> Rooms;
+	std::atomic<UINT32> ObjectIdCount{ 0 };
 };

@@ -175,7 +175,7 @@ void IocpServer::WorkerThread()
 			OnRecv(pClientInfo->idx, pClientInfo->RecvBuf, dwIoSize);//가상함수호출
 
 			//비동기 수신 처리
-			BindRecv(pClientInfo);//근데 이렇게 하면 이 클라이언트인포에서 동시에 여러개의 수신요청이 날아오면 문제가 발생하지 않나?
+			BindRecv(pClientInfo);
 
 		}
 		//send 결과 처리

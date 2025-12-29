@@ -225,35 +225,35 @@ struct ClientSession
 	void GetLocation(PacketMoveReq& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
-		Locate.x = Cdata.x;
-		Locate.y = Cdata.y;
-		Locate.z = Cdata.z;
-		Locate.Yaw = Cdata.Yaw;
+		Locate.x = Cdata.ActorPoint.x;
+		Locate.y = Cdata.ActorPoint.y;
+		Locate.z = Cdata.ActorPoint.z;
+		Locate.Yaw = Cdata.ActorPoint.Yaw;
 	}
 	void GetLocation(PacketMoveReqWithState& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
-		Locate.x = Cdata.x;
-		Locate.y = Cdata.y;
-		Locate.z = Cdata.z;
-		Locate.Yaw = Cdata.Yaw;
+		Locate.x = Cdata.ActorPoint.x;
+		Locate.y = Cdata.ActorPoint.y;
+		Locate.z = Cdata.ActorPoint.z;
+		Locate.Yaw = Cdata.ActorPoint.Yaw;
 		Locate.State = Cdata.State;
 	}
 	void SetLocation(PacketMoveReq& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
-		Cdata.x = Locate.x;
-		Cdata.y = Locate.y;
-		Cdata.z = Locate.z;
-		Cdata.Yaw = Locate.Yaw;
+		Cdata.ActorPoint.x = Locate.x;
+		Cdata.ActorPoint.y = Locate.y;
+		Cdata.ActorPoint.z = Locate.z;
+		Cdata.ActorPoint.Yaw = Locate.Yaw;
 	}
 	void SetLocation(PacketMoveReqWithState& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
-		Cdata.x = Locate.x;
-		Cdata.y = Locate.y;
-		Cdata.z = Locate.z;
-		Cdata.Yaw = Locate.Yaw;
+		Cdata.ActorPoint.x = Locate.x;
+		Cdata.ActorPoint.y = Locate.y;
+		Cdata.ActorPoint.z = Locate.z;
+		Cdata.ActorPoint.Yaw = Locate.Yaw;
 		Cdata.State = Locate.State;
 	}
 };
@@ -449,7 +449,7 @@ private:
 					SendData(UserList[j],(char*)&PacektBuffer,BufferTail);
 				}
 			}
-
+			roomManager.OnUpdateAllRoom(100.f);//몬스터 패킷 전송
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	}

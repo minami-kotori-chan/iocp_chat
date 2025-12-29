@@ -51,8 +51,11 @@ enum class PACKET_ID : UINT16
 	NOTICE_ROOM_NEW_USER = 3000,
 	NOTICE_ROOM_EXIT_USER = 3001,
 
-	UNIT_MOVING_DATA_REQUEST = 4000,
+	UNIT_MOVING_DATA_REQUEST = 4000,//플레이어 좌표 데이터
 	UNIT_MOVING_DATA_RESPONSE = 4001,
+
+	MONSTER_DATA = 4002,
+	
 };
 
 #pragma pack(push, 1)
@@ -148,6 +151,7 @@ struct NoticeNewUserEnterGame : NoticeNewUserEnter {//들어온 유저 알림
 	UINT32 UserId;
 	PacketMoveReq PlayerLocate;
 };
+
 struct NoticeUserExit : PacketHead {//나간 유저 알림
 	UINT32 UserId;
 };

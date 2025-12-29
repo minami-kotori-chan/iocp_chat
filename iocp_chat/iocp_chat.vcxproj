@@ -143,12 +143,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CharacterData.cpp" />
     <ClCompile Include="ChatSerer.cpp" />
     <ClCompile Include="DBManager.cpp" />
     <ClCompile Include="IOCP\Iocp.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MonsterSpawner.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="MonsterSpawner.h" />
     <ClInclude Include="CharacterData.h" />
     <ClInclude Include="ChatServer.h" />
     <ClInclude Include="ClientSession.h" />
