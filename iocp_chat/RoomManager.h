@@ -3,9 +3,13 @@
 #include <unordered_set>
 #include <vector>
 #include <shared_mutex>
+#include <thread>
+#include <condition_variable>
 #include "Packet.h"
 #include "PacketSenderInterface.h"
 #include "MonsterSpawner.h"
+#include "RoomJob.h"
+
 
 #define MAX_ENTER_USER_COUNT 1024
 #define MAX_ROOM_COUNT 100
@@ -22,6 +26,8 @@ public:
 		for (int i = 0; i < SpawnerSize; i++) {
 			RoomMonsterSpawners.push_back(new MonsterSpawner(ObjectIdCount));
 		}
+		InputJobQueue.reserve(1000);
+		JobProcessQueue.reserve(1000);
 	}
 
 	bool EnterRoom(UINT32 UserIdx)
@@ -134,24 +140,75 @@ public:
 			packet.pData = PacketBuffer;
 			BroadCastAllRoomUser(MessageSender, packet);
 			BufferTail = PacketBuffer;
+		} 
+	}
+	void PushJob(Job& job)//큐에 넣은 스레드가 일까지 처리할지 말지를 bool로 반환
+	{
+		{
+			std::lock_guard<std::mutex> lock(JobLock);
+			InputJobQueue.push_back(job);
+		}
+	}
+	bool TryGetAccess()
+	{
+		// 0에서 1 로 변경을 시도.
+		return (RoomAccessGuard.exchange(1) == 0);//변경되었을때만 큐에넣자
+	}
+	void ProcessJobQueue()
+	{
+		while (true) //큐를 다 비울때까지 반복
+		{
+			{//큐 스왑
+				std::lock_guard<std::mutex> lock(JobLock);
+
+				if (InputJobQueue.empty())
+				{
+					// 처리할 잡이 없으면 0으로 변경
+					RoomAccessGuard.store(0);
+					return;
+				}
+
+				//스왑
+				JobProcessQueue.swap(InputJobQueue);
+			}
+
+			// 잡 처리
+			for (auto& job : JobProcessQueue)
+			{
+				job(); // 잡 실행
+			}
+
+			JobProcessQueue.clear();
 		}
 	}
 
+	UINT32 RoomId;
 private:
 
 	UINT32 MaxEnterSize = MAX_ENTER_USER_COUNT;
 	std::shared_mutex UserHashLock; 
 	std::unordered_set<UINT32> EnterUsers;
 	std::vector<MonsterSpawner*> RoomMonsterSpawners;
+
+	std::vector<Job> InputJobQueue;
+	std::vector<Job> JobProcessQueue;
+	std::mutex JobLock;
+	std::atomic<UINT8> RoomAccessGuard{ 0 };
+
+	
 };
 
 class RoomManager
 {
 public:
-	void Init(UINT32 RoomsCount = MAX_ROOM_COUNT)
+	void Init(UINT32 RoomsCount = MAX_ROOM_COUNT,UINT32 SetProcessThreadCount=1)
 	{
 		for (UINT32 i = 0; i < RoomsCount; i++) {
 			Rooms.emplace_back(new ChatRoom(&ObjectIdCount));
+			Rooms[i]->RoomId = i;
+		}
+		for (UINT32 i = 0; i < SetProcessThreadCount; i++) {
+			RoomJobProcessThreads.emplace_back([this]() {ProcessJob(); });
 		}
 	}
 	void SetSender(PacketSenderInterface* Sender)
@@ -203,12 +260,71 @@ public:
 	{
 		for (auto* Room : Rooms) {
 			Room->Update(MessageSender,DeltaTime);
+			Job updateJob = [Room, this, DeltaTime](){Room->Update(this->MessageSender, DeltaTime);};
+
+			PushJob(Room->RoomId, updateJob);
+		}
+
+	}
+	ChatRoom* GetRoomPtr(UINT32 Roomid)
+	{
+		return Rooms[Roomid];
+	}
+	~RoomManager()
+	{
+		StopThread();
+	}
+	void PushJob(UINT32 RoomId, Job& job)
+	{
+		Rooms[RoomId]->PushJob(job);
+		if (Rooms[RoomId]->TryGetAccess())
+		{
+			std::lock_guard<std::mutex> lock(JobQueueLock);
+			JobQueue.push_back(RoomId);
+			JobQueueLockCV.notify_one();
 		}
 	}
 private:
+	void StopThread()
+	{
+		ThreadsRun = false;
+		for (auto& i : RoomJobProcessThreads) {
+			if (i.joinable()) {
+				i.join();
+			}
+		}
+	}
+	void ProcessJob()
+	{
+		while (ThreadsRun)
+		{
+			UINT32 targetRoomId = 0;
 
+			{
+				std::unique_lock<std::mutex> lock(JobQueueLock);
+				
+				JobQueueLockCV.wait(lock, [this] {return !JobQueue.empty() || !ThreadsRun;});
+
+				if (!ThreadsRun) break;
+
+				targetRoomId = JobQueue.front();
+				JobQueue.pop_front();
+
+			}
+
+			Rooms[targetRoomId]->ProcessJobQueue();
+			
+		}
+	}
 
 	PacketSenderInterface* MessageSender;
 	std::vector<ChatRoom*> Rooms;
-	std::atomic<UINT32> ObjectIdCount{ 0 };
+	std::atomic<UINT32> ObjectIdCount{ 20000 };//최종 플레이어 id보다 크게 설정해서 겹치지않게 하자
+	std::vector<std::thread> RoomJobProcessThreads;
+
+	std::deque<UINT32> JobQueue;// 어떤 방의 작업을 처리해야하는지 적어놓는 큐
+	std::mutex JobQueueLock;//위 큐의 락
+	std::condition_variable JobQueueLockCV;
+
+	bool ThreadsRun = true;
 };

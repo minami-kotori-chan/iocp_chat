@@ -29,5 +29,6 @@ void MonsterData::SetPacketData(MonsterMovingData& Packet)
 	Packet.y = ActorPoint.y;
 	Packet.z= ActorPoint.z;
 	Packet.Yaw =  ActorPoint.Yaw;
+	Packet.Health = health;
 	Packet.MonsterType = MonsterType;
 }

@@ -239,6 +239,17 @@ struct ClientSession
 		Locate.Yaw = Cdata.ActorPoint.Yaw;
 		Locate.State = Cdata.State;
 	}
+	void GetLocation(PacketMoveRes& Locate)
+	{
+		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
+		Locate.x = Cdata.ActorPoint.x;
+		Locate.y = Cdata.ActorPoint.y;
+		Locate.z = Cdata.ActorPoint.z;
+		Locate.Yaw = Cdata.ActorPoint.Yaw;
+		Locate.State = Cdata.State;
+		Locate.UserId = ClientIdx;
+		Locate.Health = Cdata.health;
+	}
 	void SetLocation(PacketMoveReq& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
@@ -424,7 +435,7 @@ private:
 	{
 		while (SendLocateThreadRun)
 		{
-			for (UINT32 i = 0; i < MAX_ROOM_COUNT; i++) 
+			for (UINT32 i = 0; i < MAX_ROOM_COUNT; i++)//이부분은 나중에 룸에서 send하게 수정하자
 			{
 				UINT32 UserList[MAX_ENTER_USER_COUNT];
 				UINT32 UserSize=0;
@@ -438,9 +449,7 @@ private:
 				UserLocate.PacketSize = sizeof(PacketMoveRes);
 
 				for (UINT32 j = 0; j < UserSize; j++) {
-					
-					UserLocate.UserId = ClientSessions[UserList[j]]->ClientIdx;
-					ClientSessions[UserList[j]]->GetLocation((PacketMoveReqWithState&)UserLocate);
+					ClientSessions[UserList[j]]->GetLocation(UserLocate);
 					CopyMemory(&PacektBuffer[BufferTail],&UserLocate,sizeof(PacketMoveRes));
 					BufferTail += sizeof(PacketMoveRes);
 				}

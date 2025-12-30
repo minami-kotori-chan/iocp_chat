@@ -89,11 +89,11 @@ void MonsterSpawner::SetSpawnDataRandom()
     static thread_local std::mt19937 Generator(std::random_device{}());
 
     // ==========================================
-    const float MinRadis = 100.0f;
-    const float MaxRadis = 1500.0f;
+    const float MinRadis = -5000.0f;
+    const float MaxRadis = 5000.0F;
 
     // 스폰 반경 (200 ~ 500)
-    std::uniform_real_distribution<float> DistRadius(200.0f, 500.0f);
+    std::uniform_real_distribution<float> DistRadius(1000.0f, 3000.0f);
 
     // 위치
     std::uniform_real_distribution<float> DistPos(MinRadis, MaxRadis);
