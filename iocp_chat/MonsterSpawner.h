@@ -12,14 +12,17 @@ struct SpawnData {
     UINT32 MaxCount;    // 유지할 개체 수
     float RespawnTime; // 죽은 뒤 부활까지 걸리는 시간
 };
-
+class RoomManager;
 class MonsterSpawner {
 public:
     MonsterSpawner();
     MonsterSpawner(std::atomic<UINT32>* Counter);
     MonsterSpawner(SpawnData InData);
     
-
+    void InitRoomId(UINT32 Roomid) { RoomId = Roomid; }
+    UINT32 GetRoomId() { return RoomId; }
+    void InitRoomManager(RoomManager* RMPtr) { roomManager = RMPtr; }
+    RoomManager* GetRoomManager() { return roomManager; }
     // 일정 시간마다 호출되어 리스폰 체크
     void Update(float DeltaTime);
 
@@ -62,4 +65,7 @@ private:
     std::vector<MonsterData*> AliveMonsterArray;
 
     std::atomic<UINT32>* ObjectIdCounter;
+
+    UINT32 RoomId;
+    RoomManager* roomManager;
 };

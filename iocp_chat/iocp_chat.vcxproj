@@ -149,6 +149,7 @@
     <ClCompile Include="IOCP\Iocp.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MonsterSpawner.cpp" />
+    <ClCompile Include="RoomManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MonsterSpawner.h" />

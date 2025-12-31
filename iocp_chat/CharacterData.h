@@ -51,11 +51,13 @@ enum class MonsterState : UINT8 {
 class MonsterSpawner;//순환참조 막기용
 struct MonsterMovingData;
 
-struct MonsterData : CharacterData
+struct MonsterData : public CharacterData
 {
     UINT32 MonsterType;
     MonsterSpawner* Spawner;
     UINT32 ObjectId;
+    UINT32 Section;
+    UINT32 TargetUser= 0xffffffff;
 
     Location DestinationLocate;//타켓이 생겼을때 목표하는 지점 혹은 순찰중일때 타겟지점
     bool IsSpawned = true;

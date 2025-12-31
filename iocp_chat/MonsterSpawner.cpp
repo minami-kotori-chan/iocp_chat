@@ -2,7 +2,8 @@
 #include <cmath>
 #include <random>
 #include "Packet.h"
-
+#include "RoomJob.h"
+#include "RoomManager.h"
 
 MonsterSpawner::MonsterSpawner()
 {
@@ -81,6 +82,8 @@ void MonsterSpawner::OnMonsterDead(MonsterData* Monster)
     RespawnQueue.push_back({ ServerTime + Data.RespawnTime,Index });
     CurrentCount--;//개체수 줄이기
 
+    //여기에 leave요청 넣어야함
+
 }
 
 void MonsterSpawner::SetSpawnDataRandom()
@@ -126,10 +129,10 @@ bool MonsterSpawner::SetMonstersPacket(const char* BufferHead,const char* LastBu
 {
     UINT16 LastSend = 0;
     char* BufferWrite = (char*)BufferHead;
-    for (auto i = AliveMonsterArray.begin()+SendStartIndex; i < AliveMonsterArray.end(); ++i, LastSend++) {
+    for (UINT16 i = SendStartIndex; i < AliveMonsterArray.size(); ++i, LastSend++) {
         if (BufferWrite + sizeof(MonsterMovingData) > LastBufferAddress) { SendStartIndex += LastSend; return false; }//쓸 공간이 없으면 false반환
         MonsterMovingData MonsterPacket;//원래는 player용으로 설계된 패킷구조이긴하나 몬스터를 담아도 크게 문제없을듯함
-        (*i)->SetPacketData(MonsterPacket);
+        AliveMonsterArray[i]->SetPacketData(MonsterPacket);
         memcpy(BufferWrite,&MonsterPacket, MonsterPacket.PacketSize);
         LastSend++;
         BufferWrite += sizeof(MonsterMovingData);
@@ -175,8 +178,16 @@ void MonsterSpawner::SpawnMonster()
     Monster->Reset(x, y);
 
     // 리스트에 등록
-    AliveMonsterArray.push_back(Monster);
-    AliveMonster.insert({ Monster,AliveMonsterArray.size() - 1 });
-
+    //AliveMonsterArray.push_back(Monster);
+    //AliveMonster.insert({ Monster,AliveMonsterArray.size() - 1 });
+    
+    Job Execute = [RoomPtr = roomManager->GetRoomPtr(RoomId), Monster,this]() {
+        RoomPtr->EnterObjectInRoom(Monster->ObjectId, Monster->ActorPoint);
+        this->AliveMonsterArray.push_back(Monster);
+        this->AliveMonster.insert({ Monster,AliveMonsterArray.size() - 1 });
+        Monster->Section = RoomPtr->GetSectionIndex(Monster->ActorPoint.x, Monster->ActorPoint.y);
+        return;
+    };
+    roomManager->PushJob(RoomId, std::move(Execute));
     CurrentCount++; 
 }

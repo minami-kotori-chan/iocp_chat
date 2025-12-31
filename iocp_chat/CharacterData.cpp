@@ -1,5 +1,6 @@
 #include "CharacterData.h"
 #include "MonsterSpawner.h"
+#include "RoomManager.h"
 #include "Packet.h"
 
 void MonsterData::SetSpawner(MonsterSpawner* MSpawner)
@@ -13,10 +14,77 @@ void MonsterData::OnDead()
 }
 
 void MonsterData::Update(float DeltaTime)//현재 상태에따라 순찰, 타켓이동을 위해 DestinationLocate으로 이동하는 코드 작성
-{
+{//추가로 해당코드는 어차피 룸처리 스레드에서 호출됨(스레드 세이프함이 보장됨)
 	if (IsSpawned) { IsSpawned = false; return; }//이번 프레임에 스폰되었으면 return
+	//우선 근처에 플레이어가 있는지 보고
+	//가장 가까운 플레이어를 타켓팅하고
+	//상태를 추격으로 바꾸고
+	//이동한다.
+    /*
+	if (TargetUser == 0xffffffff) {
+		TargetUser = Spawner->GetRoomManager()->GetRoomPtr(Spawner->GetRoomId())->FindNearestUserInSight(ActorPoint, ActorPoint.Yaw, 500.f, 120.f);
+		if (TargetUser == 0xffffffff) return;
+	}
+	else {
+		//기존의 타겟팅 유저가 너무 먼지 확인 후 TargetUser초기화 할지 말지 결정
+	}*/
+	//Spawner->GetRoomManager()->GetRoomPtr(Spawner->GetRoomId())->GetUserLocation(TargetUser);//이 코드를 사용하면 유저의 location을 얻을 수 있음 반환 타입 : Location
 
+    const UINT32 INVALID_USER_ID = 0xffffffff;
+    const float ATTACK_RANGE = 100.0f;      // 공격 사거리
+    const float GIVE_UP_RANGE = 800.0f;     // 추격 포기 거리
+    const float TRACE_RANGE = 500.0f;       // 탐지 범위
+    const float MOVE_SPEED = 300.0f;        // 몬스터 이동 속도
+    const float ANGLE_RANGE = 120.0f;       // 시야각
 
+    auto CurrentRoom = Spawner->GetRoomManager()->GetRoomPtr(Spawner->GetRoomId());
+
+    if (TargetUser == INVALID_USER_ID)
+    {
+        TargetUser = CurrentRoom->FindNearestUserInSight(ActorPoint, ActorPoint.Yaw, TRACE_RANGE, ANGLE_RANGE);
+
+        if (TargetUser == INVALID_USER_ID) return;
+    }
+
+    Location UserLoc = CurrentRoom->GetUserLocation(TargetUser);
+
+    float dx = UserLoc.x - ActorPoint.x;
+    float dy = UserLoc.y - ActorPoint.y;
+    float DistSq = (dx * dx) + (dy * dy);
+
+    //추격 포기
+    if (DistSq > GIVE_UP_RANGE * GIVE_UP_RANGE)
+    {
+        TargetUser = INVALID_USER_ID; // 타겟 초기화
+        //원래 자리로 돌아가기
+        return;
+    }
+
+    if (DistSq <= ATTACK_RANGE * ATTACK_RANGE)
+    {
+        // 이동 멈춤 + 공격 수행
+    }
+    else
+    {
+        // 이동
+        float Dist = std::sqrt(DistSq);
+
+        //방향 벡터
+        float DirX = dx / Dist;
+        float DirY = dy / Dist;
+
+        // 위치 업데이트
+        ActorPoint.x += DirX * MOVE_SPEED * DeltaTime;
+        ActorPoint.y += DirY * MOVE_SPEED * DeltaTime;
+
+        //몬스터가 타겟을 바라보게 함
+        float Radian = std::atan2(DirY, DirX);
+        ActorPoint.Yaw = Radian * (180.0f / 3.14);
+
+        // 8. 룸에 위치 갱신 알림 (섹션 이동 처리 등을 위해 필수)
+        // 몬스터 객체 내부의 Move 함수나, 룸의 MoveObject 함수 호출
+        CurrentRoom->MoveObjectInRoom(ObjectId, Section, ActorPoint);
+    }
 }
 
 void MonsterData::SetPacketData(MonsterMovingData& Packet)

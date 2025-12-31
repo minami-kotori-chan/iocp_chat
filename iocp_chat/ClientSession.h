@@ -37,6 +37,7 @@ struct ClientSession
 	UINT16 BufDataSize;
 
 	UINT32 RoomId;
+	UINT32 Section;
 
 	std::string UserName;//추후에 이것도 char배열로 만들어야 함 동적할당 최소화를 위해서
 
@@ -222,6 +223,22 @@ struct ClientSession
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
 		CState = ClinetState::LOGIN;
 	}
+	void SetLocationOnRoomThread(PacketMoveReqWithState& Locate)
+	{
+		Cdata.ActorPoint.x = Locate.x;
+		Cdata.ActorPoint.y = Locate.y;
+		Cdata.ActorPoint.z = Locate.z;
+		Cdata.ActorPoint.Yaw = Locate.Yaw;
+		Cdata.State = Locate.State;
+	}
+
+	//////////////////////////////////////////
+	//좌표를 위해 락을 얻는 구조는 사용 안할 예정
+	//////////////////////////////////////////
+	Location GetLocate()
+	{
+		return Cdata.ActorPoint;
+	}
 	void GetLocation(PacketMoveReq& Locate)
 	{
 		std::lock_guard<std::shared_mutex> lock(ClientSessionLock);
@@ -289,6 +306,7 @@ public:
 		//room 초기화
 		roomManager.Init();
 		roomManager.SetSender(sender);
+		roomManager.SetClientSessionManager(this);
 		this->sender = sender;
 	}
 	void SetThroughput(std::atomic<UINT64>& lostpacket)
@@ -458,7 +476,7 @@ private:
 					SendData(UserList[j],(char*)&PacektBuffer,BufferTail);
 				}
 			}
-			roomManager.OnUpdateAllRoom(100.f);//몬스터 패킷 전송
+			roomManager.OnUpdateAllRoom(0.1f);//몬스터 패킷 전송
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	}
@@ -569,48 +587,58 @@ private:
 	void OnGameRoomEnter(LPacket& packet)
 	{
 		EnterRoomPacket* EnterPacket = (EnterRoomPacket*)packet.pData;
-		bool Success = roomManager.EnterRoom(packet.ClientIdx, EnterPacket->RoomId);
-		ClientSessions[packet.ClientIdx]->EnterRoom(EnterPacket->RoomId);
+		//bool Success = roomManager.EnterRoom(packet.ClientIdx, EnterPacket->RoomId);
+		//ClientSessions[packet.ClientIdx]->EnterRoom(EnterPacket->RoomId);
 		//PushLpacketResult(PACKET_ID::ENTER_ROOM_RESPONSE, Success, packet);
-		if (Success == false) return;
-		NoticeNewUserEnterGame NewUserEnter;
-		NewUserEnter.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
-		NewUserEnter.PacketSize = sizeof(NoticeNewUserEnterGame);
-		CopyMemory(NewUserEnter.UserName, ClientSessions[packet.ClientIdx]->UserName.c_str(), ClientSessions[packet.ClientIdx]->UserName.size());
-		NewUserEnter.UserId = packet.ClientIdx;
-		ClientSessions[packet.ClientIdx]->GetLocation(NewUserEnter.PlayerLocate);
+		//if (Success == false) return;
+		Job Execute = [RoomId=EnterPacket->RoomId,locate = ClientSessions[packet.ClientIdx]->Cdata.ActorPoint, ClientPtr = ClientSessions[packet.ClientIdx], RoomPtr = roomManager.GetRoomPtr(EnterPacket->RoomId),this]() {//람다함수는 힙할당이 일어남(매개변수 캡쳐해야해서) 따라서 TMP를 써서 매개변수를 내부에 넣게 Job을 수정해야함
+			if (!(RoomPtr->EnterGameRoom(ClientPtr->ClientIdx, (Location&)locate)))return;
+			ClientPtr->EnterRoom(RoomId);
+			ClientPtr->Section = RoomPtr->GetSectionIndex(locate.x,locate.y);
+
+			EnterRoomPacketResponse ResponsePacket;
+			ResponsePacket.PacketId = PACKET_ID::GAME_ROOM_ENTER_RESPONSE;
+			ResponsePacket.PacketSize = sizeof(EnterRoomPacketResponse);
+			ResponsePacket.RoomId = RoomId;
+			ResponsePacket.UserId = ClientPtr->ClientIdx;
+			SendData(ResponsePacket.UserId, (char*)&ResponsePacket, ResponsePacket.PacketSize);//방입장 응답 패킷(정상작동)
+
+			NoticeNewUserEnterGame NewUserEnter;
+			NewUserEnter.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
+			NewUserEnter.PacketSize = sizeof(NoticeNewUserEnterGame);
+			CopyMemory(NewUserEnter.UserName, ClientPtr->UserName.c_str(), ClientPtr->UserName.size());
+			NewUserEnter.UserId = ClientPtr->ClientIdx;
+			ClientPtr->GetLocation(NewUserEnter.PlayerLocate);
+
+			LPacket SendPacket;
+			SendPacket.PacketId = NewUserEnter.PacketId;
+			SendPacket.PacketSize = NewUserEnter.PacketSize;
+			SendPacket.ClientIdx = ClientPtr->ClientIdx;
+			//SendPacket.pData = (char*) &NewUserEnter;
+			CopyMemory(SendPacket.pData, &NewUserEnter, sizeof(NewUserEnter));
+
+			//기존 유저 목록을 입장자에게 넘기는 코드
+			UINT32 UserList[MAX_ENTER_USER_COUNT];
+			UINT32 UserSize;
+			roomManager.GetRoomUserList(RoomId, (char*)UserList, UserSize);
+
+			NoticeNewUserEnterGame OldUser;
+			OldUser.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
+			OldUser.PacketSize = sizeof(NoticeNewUserEnterGame);
+
+			for (UINT32 i = 0; i < UserSize; i++) {//지금은 이런식으로 구현해두었지만 추후에는 100명씩 끊어서 버퍼에 담아서 한번에 주는 방식으로 구현하자
+				OldUser.UserId = UserList[i];
+				CopyMemory(OldUser.UserName, ClientSessions[UserList[i]]->UserName.c_str(), ClientSessions[UserList[i]]->UserName.size());
+				ClientSessions[UserList[i]]->GetLocation(OldUser.PlayerLocate);
+				SendData(SendPacket.ClientIdx, (char*)&OldUser, OldUser.PacketSize);
+			}
+
+			roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
+
+			return;
+		};
+		roomManager.PushJob(EnterPacket->RoomId, std::move(Execute));
 		
-		LPacket SendPacket;
-		SendPacket.PacketId = NewUserEnter.PacketId;
-		SendPacket.PacketSize = NewUserEnter.PacketSize;
-		SendPacket.ClientIdx = packet.ClientIdx;
-		//SendPacket.pData = (char*) &NewUserEnter;
-		CopyMemory(SendPacket.pData, &NewUserEnter, sizeof(NewUserEnter));
-
-		EnterRoomPacketResponse ResponsePacket;
-		ResponsePacket.PacketId = PACKET_ID::GAME_ROOM_ENTER_RESPONSE;
-		ResponsePacket.PacketSize = sizeof(EnterRoomPacketResponse);
-		ResponsePacket.RoomId = EnterPacket->RoomId;
-		ResponsePacket.UserId = packet.ClientIdx;
-		SendData(ResponsePacket.UserId,(char*) & ResponsePacket, ResponsePacket.PacketSize);//방입장 응답 패킷(정상작동)
-
-		//기존 유저 목록을 입장자에게 넘기는 코드
-		UINT32 UserList[MAX_ENTER_USER_COUNT];
-		UINT32 UserSize;
-		roomManager.GetRoomUserList(EnterPacket->RoomId,(char*)UserList,UserSize);
-
-		NoticeNewUserEnterGame OldUser;
-		OldUser.PacketId = PACKET_ID::NOTICE_ROOM_NEW_USER;
-		OldUser.PacketSize = sizeof(NoticeNewUserEnterGame);
-
-		for (UINT32 i = 0; i < UserSize; i++) {//지금은 이런식으로 구현해두었지만 추후에는 100명씩 끊어서 버퍼에 담아서 한번에 주는 방식으로 구현하자
-			OldUser.UserId = UserList[i];
-			CopyMemory(OldUser.UserName, ClientSessions[UserList[i]]->UserName.c_str(), ClientSessions[UserList[i]]->UserName.size());
-			ClientSessions[UserList[i]]->GetLocation(OldUser.PlayerLocate);
-			SendData(SendPacket.ClientIdx, (char*)&OldUser, OldUser.PacketSize);
-		}
-
-		roomManager.BroadCastAllRoomUser(ClientSessions[SendPacket.ClientIdx]->GetUserRoomId(), SendPacket);
 	}
 	void OnGameRoomExit(LPacket& packet)
 	{
@@ -633,8 +661,15 @@ private:
 	}
 	void OnMovingData(LPacket& packet)
 	{
-		PacketMoveReqWithState* Locate = (PacketMoveReqWithState*)packet.pData;
-		ClientSessions[packet.ClientIdx]->SetLocation(*Locate);
+		PacketMoveReqWithState* Locate = (PacketMoveRes*)packet.pData;
+		//ClientSessions[packet.ClientIdx]->SetLocation(*Locate);
+		Job Execute = [locate=*Locate,ClientPtr= ClientSessions[packet.ClientIdx],RoomPtr = roomManager.GetRoomPtr(ClientSessions[packet.ClientIdx]->GetUserRoomId())]() {//람다함수는 힙할당이 일어남(매개변수 캡쳐해야해서) 따라서 TMP를 써서 매개변수를 내부에 넣게 Job을 수정해야함
+			//섹션 이동인지 확인하고 처리하는 코드 작성 필요 이를 위해서 룸포인터를 가지고 있어야할 필요가 있음
+			RoomPtr->MoveUserInRoom(ClientPtr->ClientIdx, ClientPtr->Section,ClientPtr->Cdata.ActorPoint);
+			ClientPtr->SetLocationOnRoomThread((PacketMoveReqWithState&)locate); 
+			return;
+			};
+		roomManager.PushJob(ClientSessions[packet.ClientIdx]->GetUserRoomId(),std::move(Execute));//람다 함수 소유권을 넘김(다만 이경우 이동이 발생하기 때문에 생성1회 이동2회임 근데 이동비용은 감당 못할정도는 아니니 이대로 작성)
 	}
 	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
 	{
