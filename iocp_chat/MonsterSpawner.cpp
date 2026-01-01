@@ -35,8 +35,8 @@ void MonsterSpawner::InitializePool()
         // 역참조를 위해 스포너 포인터 미리 세팅
         Pool[i].SetSpawner(this);
         Pool[i].SetMonsterData(Data.MonsterType);
-
-        Pool[i].ObjectId = ObjectIdCounter->fetch_add(1);//
+        
+        Pool[i].ObjectId = ObjectIdCounter->fetch_add(1);
     }
 }
 
@@ -141,6 +141,13 @@ bool MonsterSpawner::SetMonstersPacket(const char* BufferHead,const char* LastBu
     
     
     return true;
+}
+
+void MonsterSpawner::SetObjectIdToMPtr(std::unordered_map<UINT32, MonsterData*>& ObjectIdMap)
+{
+    for (const auto& Monster : Pool) {
+        ObjectIdMap.insert({ Monster.ObjectId,(MonsterData*)&Monster});
+    }
 }
 
 void MonsterSpawner::GetRandomSpawnPos(float& OutX, float& OutY)

@@ -24,11 +24,12 @@ public:
 		const UINT8 SpawnerSize = 5;
 		RoomMonsterSpawners.reserve(SpawnerSize);//일단 5개로 하고 나중에 랜덤으로 되게 하자
 		roomManager = RMptr;
-
+		
 		for (int i = 0; i < SpawnerSize; i++) {
 			RoomMonsterSpawners.push_back(new MonsterSpawner(ObjectIdCount));
 			RoomMonsterSpawners[i]->InitRoomId(RoomId);
 			RoomMonsterSpawners[i]->InitRoomManager(RMptr);
+			RoomMonsterSpawners[i]->SetObjectIdToMPtr(ObjectIdToMonsterPtr);
 		}
 		InputJobQueue.reserve(1000);
 		JobProcessQueue.reserve(1000);
@@ -147,8 +148,26 @@ public:
 	}
 	// 반환값: 가장 가까운 유저의 ID (못 찾으면 최대값반환) 유저 id만 가지고 좌표를 얻어야하는데 구조적으로 clientsession에 접근해야해서 cpp파일로 분리함(전방선언한 포인터를 써야해서)
 	UINT32 FindNearestUserInSight(const Location& MonsterLoc, float MonsterYaw, float Range, float FovAngle);
+	UINT32 FindNearestMonsterInSight(const Location& UserLoc, float UserYaw, float Range, float FovAngle);
 	bool IsInSight(const Location& MonsterLoc, float MonsterYaw, const Location& TargetLoc, float Range, float FovAngle);
 	Location GetUserLocation(UINT32 Userid);
+	void OnUserDamage(UINT32 AttackObjectId,UINT32 DamagedUsertId,float Damage,UINT32 Section);
+
+	void OnMonsterAttack(PacketSenderInterface* MessageSender,UINT32 ObjectId,UINT32 Section)
+	{
+		NoticeUserExit Pkt;//패킷구조는 방나가기와 동일하게 오브젝트번호만 있으면 됨
+		Pkt.PacketId = PACKET_ID::MONSTER_ATTACK;
+		Pkt.PacketSize = sizeof(NoticeUserExit);
+		LpPacket SendPkt;
+		SendPkt.PacketSize = Pkt.PacketSize;
+		SendPkt.pData = (char*) & Pkt;
+		BroadCastAllRoomUser(MessageSender, SendPkt);
+	}
+
+	void OnMonsterDamaged(UINT32 ObjectId,float Damage)
+	{
+		ObjectIdToMonsterPtr[ObjectId]->OnDamaged(Damage);
+	}
 
 	bool MoveUserInRoom(UINT32 ObjectId, UINT32 SectionIdx, const Location& locate)	//섹션이 변경되면 true
 	{
@@ -342,6 +361,8 @@ private:
 	std::vector<std::vector<UINT32>> GameSectionsOnlyUser;
 	std::vector<UINT8> SectionActivate;
 
+	std::unordered_map<UINT32, MonsterData*> ObjectIdToMonsterPtr;//오브젝트 Id로 몬스터 접근하게 하는 해시
+
 	float WorldMinX = -25000.0f; // 맵의 최소 X좌표
 	float WorldMaxX = 25000.0f; // 맵의 최대 X좌표
 	float WorldMinY = -25000.0f; // 맵의 최소 Y좌표 
@@ -415,6 +436,12 @@ public:
 	{
 		if (RoomId < Rooms.size()) {
 			Rooms[RoomId]->GetEnterRoomClientList(UserList, UserSize);
+		}
+	}
+	void OnMonsterAttack(UINT32 RoomId,UINT32 ObjectId,UINT32 Section)
+	{
+		if (RoomId < Rooms.size()) {
+			Rooms[RoomId]->OnMonsterAttack(MessageSender, ObjectId, Section);
 		}
 	}
 	void OnUpdateAllRoom(float DeltaTime)

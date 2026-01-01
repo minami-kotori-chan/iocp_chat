@@ -31,6 +31,7 @@ UINT32 ChatRoom::FindNearestUserInSight(const Location& MonsterLoc, float Monste
 
 			int SectionIdx = (CheckY * SectionCountX) + CheckX;
 
+
 			// 유저 순회
 			for (UINT32 UserIdx : GameSectionsOnlyUser[SectionIdx])
 			{
@@ -57,6 +58,55 @@ UINT32 ChatRoom::FindNearestUserInSight(const Location& MonsterLoc, float Monste
 
 	return BestTargetId;
 	
+}
+
+UINT32 ChatRoom::FindNearestMonsterInSight(const Location& UserLoc, float UserYaw, float Range, float FovAngle)
+{
+	UINT32 BestTargetId = 0xffffffff;
+	float MinDistSq = Range * Range; // 탐색 범위의 제곱을 초기 최소 거리로 설정
+
+	// 섹션 인덱스 계산
+	int CenterX = GetSectionX(UserLoc.x);
+	int CenterY = GetSectionY(UserLoc.y);
+
+	// 주변 9개 섹션 순회
+	for (int y = -1; y <= 1; ++y)
+	{
+		for (int x = -1; x <= 1; ++x)
+		{
+			int CheckX = CenterX + x;
+			int CheckY = CenterY + y;
+
+			if (CheckX < 0 || CheckX >= SectionCountX || CheckY < 0 || CheckY >= SectionCountY)
+				continue;
+
+			int SectionIdx = (CheckY * SectionCountX) + CheckX;
+
+
+			// 몬스터 순회
+			for (UINT32 MonsterIdx : GameSectionsOnlyUser[SectionIdx])
+			{
+				//맵에 있는지 검사하는 로직이 필요 할 수 있음
+				Location MonsterLoc = ObjectIdToMonsterPtr[MonsterIdx]->ActorPoint;
+
+				float dx = MonsterLoc.x - UserLoc.x;
+				float dy = MonsterLoc.y - UserLoc.y;
+				float DistSq = (dx * dx) + (dy * dy);
+
+				if (DistSq >= MinDistSq) continue;
+
+				// 시야각 체크
+
+				if (IsInSight(UserLoc, UserYaw, MonsterLoc, Range, FovAngle))
+				{
+					MinDistSq = DistSq;
+					BestTargetId = MonsterIdx;
+				}
+			}
+		}
+	}
+	//if(Damage!=0.f) ObjectIdToMonsterPtr[BestTargetId]->OnDamaged(Damage);//가장 가까운 적만 피격판정
+	return BestTargetId;
 }
 
 bool ChatRoom::IsInSight(const Location& MonsterLoc, float MonsterYaw, const Location& TargetLoc, float Range, float FovAngle)
@@ -109,4 +159,18 @@ bool ChatRoom::IsInSight(const Location& MonsterLoc, float MonsterYaw, const Loc
 Location ChatRoom::GetUserLocation(UINT32 Userid)
 {
 	return roomManager->ClientSessionPtr->GetClient(Userid)->GetLocate();
+}
+
+void ChatRoom::OnUserDamage(UINT32 AttackObjectId, UINT32 DamagedUsertId, float Damage, UINT32 Section)
+{
+	NoticeDamage Packet;
+	Packet.CurrentHealth= roomManager->ClientSessionPtr->OnDamage(DamagedUsertId, Damage);
+	Packet.Damage = Damage;
+	Packet.ObjectId = DamagedUsertId;
+	Packet.PacketId = PACKET_ID::ON_DAMAGED_USER;
+	Packet.PacketSize = sizeof(Packet);
+	LpPacket SendPacket;
+	SendPacket.PacketSize = Packet.PacketSize;
+	SendPacket.pData = (char*)&Packet;
+	BroadCastAllRoomUser(roomManager->MessageSender, SendPacket);
 }

@@ -33,6 +33,7 @@ public:
 
     //버퍼에 패킷을 담아주는데 만약 다 못담은 경우 false 반환 추가로 SendStartIndex를 마지막으로 쓴 위치값으로 수정해줌
     bool SetMonstersPacket(const char* BufferHead, const char* LastBufferAddress, UINT16& SendStartIndex, UINT32& WriteBytes);
+    void SetObjectIdToMPtr(std::unordered_map<UINT32,MonsterData*>& ObjectIdMap);
 
     //혹시 외부에서 몬스터에 접근해야하는 상황을 위해서 iterator 구현
     //using iterator = std::vector<MonsterData*>;

@@ -231,6 +231,11 @@ struct ClientSession
 		Cdata.ActorPoint.Yaw = Locate.Yaw;
 		Cdata.State = Locate.State;
 	}
+	float OnDamage(float Damage)
+	{
+		Cdata.health -= Damage;
+		return Cdata.health;
+	}
 
 	//////////////////////////////////////////
 	//좌표를 위해 락을 얻는 구조는 사용 안할 예정
@@ -367,6 +372,11 @@ public:
 	{
 		RQueManager = RManager;
 	}
+	float OnDamage(UINT32 ClientIdx, float Damage)
+	{//데미지를 받으면 남은 체력을 반환
+		return ClientSessions[ClientIdx]->OnDamage(Damage);
+	}
+
 private:
 	void CreateProcessThreads(UINT32 ThreadCnt=14)
 	{
@@ -390,7 +400,7 @@ private:
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_ROOM_EXIT_REQUEST] = &ClientSessionManager::OnGameRoomExit;
 		RecvPacketFuncMap[(int)PACKET_ID::UNIT_MOVING_DATA_REQUEST] = &ClientSessionManager::OnMovingData;
 		RecvPacketFuncMap[(int)PACKET_ID::GAME_MESSAGE_REQUEST] = &ClientSessionManager::OnGameMessage;
-		
+		RecvPacketFuncMap[(int)PACKET_ID::USER_ATTACK_REQUEST] = &ClientSessionManager::OnUserAttack;
 	}
 
 	void ProcessRecvPacket()//패킷처리 스레드에서 호출하는 함수
@@ -670,6 +680,17 @@ private:
 			return;
 			};
 		roomManager.PushJob(ClientSessions[packet.ClientIdx]->GetUserRoomId(),std::move(Execute));//람다 함수 소유권을 넘김(다만 이경우 이동이 발생하기 때문에 생성1회 이동2회임 근데 이동비용은 감당 못할정도는 아니니 이대로 작성)
+	}
+	void OnUserAttack(LPacket& packet)
+	{
+		PacketMoveReq* Locate = (PacketMoveReq*)packet.pData;
+		Job Execute = [locate = *Locate, ClientPtr = ClientSessions[packet.ClientIdx], RoomPtr = roomManager.GetRoomPtr(ClientSessions[packet.ClientIdx]->GetUserRoomId())]() {
+			//섹션 이동인지 확인하고 처리하는 코드 작성 필요 이를 위해서 룸포인터를 가지고 있어야할 필요가 있음
+			UINT32 Objectid =  RoomPtr->FindNearestMonsterInSight(ClientPtr->GetLocate(), ClientPtr->GetLocate().Yaw, 100.f, 180.f);//이후 범위와 앵글 데미지는 클라이언트 세션에 넣자
+			RoomPtr->OnMonsterDamaged(Objectid,50.f);
+			return;
+			};
+		roomManager.PushJob(ClientSessions[packet.ClientIdx]->GetUserRoomId(), std::move(Execute));
 	}
 	void PushLpacketResult(PACKET_ID pid,bool Success, LPacket& packet)
 	{

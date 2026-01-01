@@ -55,7 +55,12 @@ enum class PACKET_ID : UINT16
 	UNIT_MOVING_DATA_RESPONSE = 4001,
 
 	MONSTER_DATA = 4002,
-	
+	MONSTER_ATTACK = 4010,
+
+	USER_ATTACK_REQUEST = 4011,//유저의 공격요정
+
+	ON_DAMAGED_USER = 5000,//유저가 데미지를 받은경우
+	ON_DAMAGED_MONSTER = 5001,//몬스터가 데미지를 받은 경우
 };
 
 #pragma pack(push, 1)
@@ -159,5 +164,9 @@ struct NoticeNewUserEnterGame : NoticeNewUserEnter {//들어온 유저 알림
 struct NoticeUserExit : PacketHead {//나간 유저 알림
 	UINT32 UserId;
 };
-
+struct NoticeDamage : PacketHead {
+	UINT32 ObjectId;
+	float Damage;
+	float CurrentHealth;
+};
 #pragma pack(pop)

@@ -13,7 +13,7 @@ struct CharacterData
 {
     Location ActorPoint;
 
-	UINT32 health=100;
+	float health=100.f;
 
     UINT8 State=0;
 
@@ -46,6 +46,7 @@ enum class MonsterState : UINT8 {
     PATROLL = 1,
     WALK = 2,
     SPAWNED=200,
+    ATTACK=100,
 };
 
 class MonsterSpawner;//순환참조 막기용
@@ -58,6 +59,11 @@ struct MonsterData : public CharacterData
     UINT32 ObjectId;
     UINT32 Section;
     UINT32 TargetUser= 0xffffffff;
+    UINT32 IndexInSpawner;
+
+    float AttackTime=0.f;//공격모션 진행시간(일정시간 이후에 실제 공격 판정을 내림)
+    const float AttackCoolTime=1.0f;//공격 이후에 쿨타임
+    float AttckCoolTimeProgress = 0.f;//쿨타임 남은 시간
 
     Location DestinationLocate;//타켓이 생겼을때 목표하는 지점 혹은 순찰중일때 타겟지점
     bool IsSpawned = true;
@@ -76,10 +82,12 @@ struct MonsterData : public CharacterData
         IsSpawned = true;
 
     }
+    
     void OnDead();
 
     // 몬스터 AI/이동 로직 (매 프레임 호출)
     void Update(float DeltaTime);
 
     void SetPacketData(MonsterMovingData& Packet);
+    void OnDamaged(float Damage);
 };
