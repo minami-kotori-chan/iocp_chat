@@ -58,6 +58,9 @@ enum class PACKET_ID : UINT16
 	MONSTER_ATTACK = 4010,
 
 	USER_ATTACK_REQUEST = 4011,//유저의 공격요정
+	NOTICE_USER_ATTACK = 4012,
+
+	NOTICE_MONSTER_DEAD = 4013,
 
 	ON_DAMAGED_USER = 5000,//유저가 데미지를 받은경우
 	ON_DAMAGED_MONSTER = 5001,//몬스터가 데미지를 받은 경우
@@ -147,7 +150,7 @@ struct PacketMoveReqWithState : PacketMoveReq {//이동 동기화 패킷 (요청) (상태 �
 
 struct PacketMoveRes : PacketMoveReqWithState {//이동 동기화 패킷 (응답)
 	UINT32 UserId;
-	UINT32 Health;
+	float Health;
 };
 struct MonsterMovingData : PacketMoveRes {//몬스터 이동동기화 및 스폰 패킷 (이동 동기화 패킷에서 타입만 추가됨)
 	UINT32 MonsterType;

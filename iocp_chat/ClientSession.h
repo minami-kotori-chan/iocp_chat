@@ -684,10 +684,19 @@ private:
 	void OnUserAttack(LPacket& packet)
 	{
 		PacketMoveReq* Locate = (PacketMoveReq*)packet.pData;
-		Job Execute = [locate = *Locate, ClientPtr = ClientSessions[packet.ClientIdx], RoomPtr = roomManager.GetRoomPtr(ClientSessions[packet.ClientIdx]->GetUserRoomId())]() {
+		Job Execute = [this,locate = *Locate, Userid = packet.ClientIdx,ClientPtr = ClientSessions[packet.ClientIdx], RoomPtr = roomManager.GetRoomPtr(ClientSessions[packet.ClientIdx]->GetUserRoomId())]() {
 			//섹션 이동인지 확인하고 처리하는 코드 작성 필요 이를 위해서 룸포인터를 가지고 있어야할 필요가 있음
-			UINT32 Objectid =  RoomPtr->FindNearestMonsterInSight(ClientPtr->GetLocate(), ClientPtr->GetLocate().Yaw, 100.f, 180.f);//이후 범위와 앵글 데미지는 클라이언트 세션에 넣자
-			RoomPtr->OnMonsterDamaged(Objectid,50.f);
+			UINT32 Objectid =  RoomPtr->FindNearestMonsterInSight(ClientPtr->GetLocate(), ClientPtr->GetLocate().Yaw, 150.f, 180.f);//이후 범위와 앵글 데미지는 클라이언트 세션에 넣자
+			if(Objectid!=0xffffffff) RoomPtr->OnMonsterDamaged(Objectid,20.f);
+			//여기에 모든 플레이어에게 해당 유저의 공격패킷을 보내기
+			ExitRoomPacket Packet;
+			Packet.PacketId = PACKET_ID::NOTICE_USER_ATTACK;
+			Packet.PacketSize = sizeof(ExitRoomPacket);
+			Packet.UserId = Userid;
+			LpPacket SendPacket;
+			SendPacket.PacketSize = Packet.PacketSize;
+			SendPacket.pData = (char*)&Packet;
+			roomManager.BroadCastAllRoomUser(RoomPtr->RoomId, SendPacket);
 			return;
 			};
 		roomManager.PushJob(ClientSessions[packet.ClientIdx]->GetUserRoomId(), std::move(Execute));

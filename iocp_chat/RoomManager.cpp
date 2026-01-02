@@ -84,7 +84,7 @@ UINT32 ChatRoom::FindNearestMonsterInSight(const Location& UserLoc, float UserYa
 
 
 			// 몬스터 순회
-			for (UINT32 MonsterIdx : GameSectionsOnlyUser[SectionIdx])
+			for (UINT32 MonsterIdx : GameSectionsOnlyMonster[SectionIdx])
 			{
 				//맵에 있는지 검사하는 로직이 필요 할 수 있음
 				Location MonsterLoc = ObjectIdToMonsterPtr[MonsterIdx]->ActorPoint;
@@ -165,6 +165,7 @@ void ChatRoom::OnUserDamage(UINT32 AttackObjectId, UINT32 DamagedUsertId, float 
 {
 	NoticeDamage Packet;
 	Packet.CurrentHealth= roomManager->ClientSessionPtr->OnDamage(DamagedUsertId, Damage);
+	printf("%d번 유저 공격당함 남은 체력 : %f\n", DamagedUsertId, Packet.CurrentHealth);
 	Packet.Damage = Damage;
 	Packet.ObjectId = DamagedUsertId;
 	Packet.PacketId = PACKET_ID::ON_DAMAGED_USER;

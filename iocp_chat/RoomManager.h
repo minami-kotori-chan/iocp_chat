@@ -158,9 +158,22 @@ public:
 		NoticeUserExit Pkt;//패킷구조는 방나가기와 동일하게 오브젝트번호만 있으면 됨
 		Pkt.PacketId = PACKET_ID::MONSTER_ATTACK;
 		Pkt.PacketSize = sizeof(NoticeUserExit);
+		Pkt.UserId = ObjectId;
 		LpPacket SendPkt;
 		SendPkt.PacketSize = Pkt.PacketSize;
 		SendPkt.pData = (char*) & Pkt;
+		BroadCastAllRoomUser(MessageSender, SendPkt);
+	}
+
+	void OnMonsterDead(PacketSenderInterface* MessageSender, UINT32 ObjectId, UINT32 Section)
+	{
+		NoticeUserExit Pkt;//패킷구조는 방나가기와 동일하게 오브젝트번호만 있으면 됨
+		Pkt.PacketId = PACKET_ID::NOTICE_MONSTER_DEAD;
+		Pkt.PacketSize = sizeof(NoticeUserExit);
+		Pkt.UserId = ObjectId;
+		LpPacket SendPkt;
+		SendPkt.PacketSize = Pkt.PacketSize;
+		SendPkt.pData = (char*)&Pkt;
 		BroadCastAllRoomUser(MessageSender, SendPkt);
 	}
 
@@ -196,6 +209,8 @@ public:
 		LeaveObjectSection(ObjectId, SectionIdx);
 
 		GameSectionsOnlyMonster[NewSectionIdx].push_back(ObjectId);
+		ObjectIdToMonsterPtr[ObjectId]->Section = NewSectionIdx;
+
 
 		return true; // 섹션 변경됨
 	}
@@ -442,6 +457,12 @@ public:
 	{
 		if (RoomId < Rooms.size()) {
 			Rooms[RoomId]->OnMonsterAttack(MessageSender, ObjectId, Section);
+		}
+	}
+	void OnMonsterDead(UINT32 RoomId, UINT32 ObjectId, UINT32 Section)
+	{
+		if (RoomId < Rooms.size()) {
+			Rooms[RoomId]->OnMonsterDead(MessageSender, ObjectId, Section);
 		}
 	}
 	void OnUpdateAllRoom(float DeltaTime)
