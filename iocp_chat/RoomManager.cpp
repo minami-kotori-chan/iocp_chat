@@ -165,7 +165,7 @@ void ChatRoom::OnUserDamage(UINT32 AttackObjectId, UINT32 DamagedUsertId, float 
 {
 	NoticeDamage Packet;
 	Packet.CurrentHealth= roomManager->ClientSessionPtr->OnDamage(DamagedUsertId, Damage);
-	printf("%d번 유저 공격당함 남은 체력 : %f\n", DamagedUsertId, Packet.CurrentHealth);
+	//printf("%d번 유저 공격당함 남은 체력 : %f\n", DamagedUsertId, Packet.CurrentHealth);
 	Packet.Damage = Damage;
 	Packet.ObjectId = DamagedUsertId;
 	Packet.PacketId = PACKET_ID::ON_DAMAGED_USER;

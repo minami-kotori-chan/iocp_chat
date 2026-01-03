@@ -33,7 +33,8 @@ struct CharacterData
 
         ActorPoint.x = dist(gen);
         ActorPoint.y = dist(gen);
-        ActorPoint.z = dist(gen);
+        //ActorPoint.z = dist(gen);
+        ActorPoint.z = 20.f;
         ActorPoint.Yaw = dist(gen);
 
         // health는 건드리지 않음
